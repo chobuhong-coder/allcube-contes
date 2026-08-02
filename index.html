@@ -67,16 +67,21 @@
     padding: 10px 12px; font-size: 12.5px; color: #0B1834; margin-bottom: 14px; line-height: 1.5;
   }
   .net-wrap {
-    background: #fff; border-radius: 16px; padding: 18px; margin-bottom: 20px;
-    box-shadow: 0 4px 16px rgba(11,24,52,0.08);
+    background: #fff; border-radius: 16px; padding: 14px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08); overflow-x: auto;
   }
   .net {
     display: grid; grid-template-columns: repeat(4, max-content); grid-template-rows: repeat(3, max-content);
-    gap: 10px; grid-template-areas: ".  U  .  ." "L  F  R  B" ".  D  .  .";
+    gap: 4px; grid-template-areas: ".  U  .  ." "L  F  R  B" ".  D  .  .";
     justify-content: center; width: max-content; margin: 0 auto;
   }
-  .net .face { display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); gap: 2px; }
-  .net .sticker { border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+  .net .face { display: grid; grid-template-columns: repeat(3, 14px); grid-template-rows: repeat(3, 14px); gap: 1px; }
+  .net .sticker { border-radius: 2px; border: 1px solid rgba(0,0,0,.15); }
+
+  @media (max-width: 420px) {
+    .net { gap: 3px; }
+    .net .face { grid-template-columns: repeat(3, 11px); grid-template-rows: repeat(3, 11px); }
+  }
 
   /* ---- 회차별 확인(리뷰) 패널 ---- */
   .round-review {
