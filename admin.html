@@ -224,25 +224,38 @@ async function loadData() {
     const bookingsRaw = await bookingsRes.json() || {};
 
     allBookingsFlat = [];
-    for (const courseId in bookingsRaw) {
-      const dates = bookingsRaw[courseId];
-      for (const date in dates) {
-        const times = dates[date];
-        for (const time in times) {
-          const entries = times[time];
-          for (const id in entries) {
-            const e = entries[id];
-            allBookingsFlat.push({
-              courseId, date, time, id,
-              name: e.name || '-',
-              phone: e.phone || '-',
-              email: e.email || '',
-              status: e.status || 'pending',
-              bookedAt: e.bookedAt || ''
-            });
-          }
+
+    function isBookingRecord(node) {
+      return node && typeof node === 'object' && !Array.isArray(node) &&
+        ('bookedAt' in node || ('name' in node && 'phone' in node));
+    }
+
+    function walk(node, pathParts, courseId) {
+      if (isBookingRecord(node)) {
+        const id = pathParts[pathParts.length - 1] || '';
+        const hierarchy = pathParts.slice(0, -1); // [date, time] 또는 [date] 또는 []
+        allBookingsFlat.push({
+          courseId,
+          date: hierarchy[0] || '-',
+          time: hierarchy[1] || '-',
+          id,
+          name: node.name || '-',
+          phone: node.phone || '-',
+          email: node.email || '',
+          status: node.status || 'pending',
+          bookedAt: node.bookedAt || ''
+        });
+        return;
+      }
+      if (node && typeof node === 'object') {
+        for (const key in node) {
+          walk(node[key], [...pathParts, key], courseId);
         }
       }
+    }
+
+    for (const courseId in bookingsRaw) {
+      walk(bookingsRaw[courseId], [], courseId);
     }
 
     populateCourseSelect();
