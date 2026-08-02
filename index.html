@@ -61,6 +61,42 @@
   .timer-box.ready .timer-display, .timer-box.locked .timer-display { color: #0B1834; }
   .timer-hint { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 12px; }
   .timer-box.ready .timer-hint, .timer-box.locked .timer-hint { color: rgba(11,24,52,0.6); }
+  /* ---- 전개도 (강제 표시) ---- */
+  .net-orient {
+    background: #EEF3FF; border: 1px solid #C9D9FF; border-radius: 10px;
+    padding: 10px 12px; font-size: 12.5px; color: #0B1834; margin-bottom: 14px; line-height: 1.5;
+  }
+  .net-wrap {
+    background: #fff; border-radius: 16px; padding: 18px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08);
+  }
+  .net {
+    display: grid; grid-template-columns: repeat(4, max-content); grid-template-rows: repeat(3, max-content);
+    gap: 10px; grid-template-areas: ".  U  .  ." "L  F  R  B" ".  D  .  .";
+    justify-content: center; width: max-content; margin: 0 auto;
+  }
+  .net .face { display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); gap: 2px; }
+  .net .sticker { border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+
+  /* ---- 회차별 확인(리뷰) 패널 ---- */
+  .round-review {
+    background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08); display: none; text-align: center;
+  }
+  .round-review.show { display: block; }
+  .round-review .rr-label { font-size: 13px; color: #888; margin-bottom: 4px; font-weight: 700; }
+  .round-review .rr-time { font-size: 32px; font-weight: 800; margin-bottom: 14px; }
+  .round-review .rr-penalties { display: flex; gap: 8px; margin-bottom: 16px; }
+  .round-review .rr-penalties button {
+    flex: 1; padding: 12px 0; border-radius: 10px; border: 1.5px solid #E5E7EB;
+    background: #fff; color: #666; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .round-review .rr-penalties button.on { background: #0B1834; color: #fff; border-color: #0B1834; }
+  .round-review .rr-next {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    background: #2F6BFF; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+
   /* ---- 5회 기록 슬롯 ---- */
   .slots {
     display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px;
@@ -152,9 +188,25 @@
     <div class="text" id="scrambleText">불러오는 중...</div>
   </div>
 
+  <div class="net-orient">🧭 그린(F)이 정면, 화이트(U)가 윗면을 향하도록 큐브를 든 상태에서 스크램블을 돌려야 아래 전개도와 일치해요. <b>스크램블을 다 돌린 후에는, 실제 큐브가 이 전개도와 똑같이 맞춰졌는지 꼭 확인해주세요!</b></div>
+  <div class="net-wrap">
+    <div class="net" id="netGrid"></div>
+  </div>
+
   <div class="timer-box" id="timerBox">
     <div class="timer-display" id="timerDisplay">0.00</div>
     <div class="timer-hint" id="timerHint">스페이스바를 눌렀다 떼면 미리보기(15초) 시작 (모바일은 탭)</div>
+  </div>
+
+  <div class="round-review" id="roundReview">
+    <div class="rr-label" id="rrLabel">1회 기록</div>
+    <div class="rr-time" id="rrTime"></div>
+    <div class="rr-penalties" id="rrPenalties">
+      <button data-p="ok">OK</button>
+      <button data-p="plus2">+2</button>
+      <button data-p="dnf">DNF</button>
+    </div>
+    <button class="rr-next" id="rrNextBtn">다음 스크램블로 →</button>
   </div>
 
   <div class="slots" id="slots"></div>
@@ -302,6 +354,121 @@ function updateScrambleDisplay() {
   if (currentIndex >= 5) return;
   document.getElementById('scrambleLabel').textContent = `${currentIndex + 1}번째 스크램블`;
   document.getElementById('scrambleText').textContent = scrambles[currentIndex] || '스크램블 없음';
+  renderNetView();
+}
+
+// ---------- 전개도(3D 좌표 기반) — 큐브타이머와 동일 엔진, 3x3x3 고정 ----------
+const NET_COLORS = { U: '#ffffff', D: '#ffe600', F: '#00e676', B: '#2979ff', L: '#ff6d00', R: '#ff1a1a' };
+const NC_FACE_TABLE = {
+  R: { axis: 'x', sign: -1 }, L: { axis: 'x', sign: 1 },
+  U: { axis: 'y', sign: -1 }, D: { axis: 'y', sign: 1 },
+  F: { axis: 'z', sign: -1 }, B: { axis: 'z', sign: 1 }
+};
+function ncRotateVec(v, axis, steps) {
+  const n = ((steps % 4) + 4) % 4;
+  let x = v.x, y = v.y, z = v.z;
+  for (let i = 0; i < n; i++) {
+    if (axis === 'x') { const ny = -z, nz = y; y = ny; z = nz; }
+    else if (axis === 'y') { const nx = z, nz2 = -x; x = nx; z = nz2; }
+    else { const nx2 = -y, ny2 = x; x = nx2; y = ny2; }
+  }
+  return { x, y, z };
+}
+function ncBuildCubies(n) {
+  const half = (n - 1) / 2;
+  const coords = []; for (let i = 0; i < n; i++) coords.push(i - half);
+  const FACE_DEFS = [
+    { face: 'R', axis: 'x', value: half }, { face: 'L', axis: 'x', value: -half },
+    { face: 'U', axis: 'y', value: half }, { face: 'D', axis: 'y', value: -half },
+    { face: 'F', axis: 'z', value: half }, { face: 'B', axis: 'z', value: -half }
+  ];
+  const cubies = [];
+  coords.forEach((x) => { coords.forEach((y) => { coords.forEach((z) => {
+    if (Math.abs(x) !== half && Math.abs(y) !== half && Math.abs(z) !== half) return;
+    const stickers = [];
+    FACE_DEFS.forEach((def) => {
+      const coord = { x, y, z }[def.axis];
+      if (coord === def.value) {
+        const normal = { x: 0, y: 0, z: 0 }; normal[def.axis] = def.value / half;
+        stickers.push({ normal, color: def.face });
+      }
+    });
+    cubies.push({ pos: { x, y, z }, stickers });
+  }); }); });
+  return cubies;
+}
+function ncApplyToken(cubies, token, n) {
+  const half = (n - 1) / 2;
+  const m = /^([UDLRFB])(w)?(2|')?$/.exec(token.trim());
+  if (!m) return false;
+  const face = m[1], wide = !!m[2], mod = m[3];
+  const quarterTurns = mod === "'" ? -1 : mod === '2' ? 2 : 1;
+  const def = NC_FACE_TABLE[face];
+  const gridSteps = def.sign * quarterTurns;
+  const extreme = (face === 'R' || face === 'U' || face === 'F') ? half : -half;
+  const dirIn = (face === 'R' || face === 'U' || face === 'F') ? -1 : 1;
+  const depths = wide ? [0, 1] : [0];
+  const targetCoords = depths.map((k) => extreme + dirIn * k);
+  cubies.forEach((c) => {
+    if (targetCoords.indexOf(c.pos[def.axis]) > -1) {
+      c.pos = ncRotateVec(c.pos, def.axis, gridSteps);
+      c.stickers.forEach((s) => { s.normal = ncRotateVec(s.normal, def.axis, gridSteps); });
+    }
+  });
+  return true;
+}
+function ncApplyScramble(scramble, n) {
+  const cubies = ncBuildCubies(n);
+  const tokens = (scramble || '').trim().split(/\s+/).filter(Boolean);
+  for (let i = 0; i < tokens.length; i++) { if (!ncApplyToken(cubies, tokens[i], n)) return null; }
+  return cubies;
+}
+const NC_FACE_READ = {
+  F: { axis: 'z', sign: 1, row: (iy) => (2 - iy), col: (ix) => ix },
+  U: { axis: 'y', sign: 1, row: (iz) => iz, col: (ix) => ix },
+  D: { axis: 'y', sign: -1, row: (iz) => (2 - iz), col: (ix) => ix },
+  L: { axis: 'x', sign: -1, row: (iy) => (2 - iy), col: (iz) => iz },
+  R: { axis: 'x', sign: 1, row: (iy) => (2 - iy), col: (iz) => (2 - iz) },
+  B: { axis: 'z', sign: -1, row: (iy) => (2 - iy), col: (ix) => (2 - ix) }
+};
+function ncReadFaceGrid(cubies, faceName, n) {
+  const half = (n - 1) / 2;
+  const spec = NC_FACE_READ[faceName];
+  const target = spec.sign === 1 ? half : -half;
+  const grid = []; for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(0); grid.push(row); }
+  cubies.forEach((c) => {
+    if (c.pos[spec.axis] !== target) return;
+    const ix = c.pos.x + half, iy = c.pos.y + half, iz = c.pos.z + half;
+    let row, col;
+    if (faceName === 'U' || faceName === 'D') { row = spec.row(iz); col = spec.col(ix); }
+    else { row = spec.row(iy); col = spec.col(faceName === 'F' || faceName === 'B' ? ix : iz); }
+    const sticker = c.stickers.find((s) => {
+      const mag = Math.abs(s.normal.x) + Math.abs(s.normal.y) + Math.abs(s.normal.z);
+      return mag === 1 && s.normal[spec.axis] !== 0 && Math.sign(s.normal[spec.axis]) === spec.sign;
+    });
+    if (sticker) grid[row][col] = sticker.color;
+  });
+  return grid;
+}
+function netBuildFaceEl(faceGrid, areaName, n) {
+  const wrap = document.createElement('div');
+  wrap.className = 'face'; wrap.style.gridArea = areaName;
+  for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+    const d = document.createElement('div');
+    d.className = 'sticker'; d.style.background = NET_COLORS[faceGrid[r][col]];
+    wrap.appendChild(d);
+  }
+  return wrap;
+}
+function renderNetView() {
+  const gridEl = document.getElementById('netGrid');
+  const scramble = scrambles[currentIndex];
+  const cubies = ncApplyScramble(scramble, 3);
+  if (!cubies) { gridEl.innerHTML = ''; return; }
+  gridEl.innerHTML = '';
+  ['U', 'L', 'F', 'R', 'B', 'D'].forEach((f) => {
+    gridEl.appendChild(netBuildFaceEl(ncReadFaceGrid(cubies, f, 3), f, 3));
+  });
 }
 
 function renderSlots() {
@@ -386,6 +553,7 @@ function speak(text) {
 function handleTap() {
   if (alreadySubmittedToday) return;
   if (currentIndex >= 5) return;
+  if (state === 'reviewing') return; // 리뷰 중엔 "다음으로" 버튼으로만 진행
   if (state === 'idle') {
     startInspection();
   } else if (state === 'inspecting') {
@@ -443,28 +611,57 @@ function startSolve() {
 function stopSolve() {
   if (rafId) cancelAnimationFrame(rafId);
   finalTime = performance.now() - startTime;
-  state = 'idle';
-  timerBox.className = 'timer-box';
+  state = 'reviewing';
+  timerBox.className = 'timer-box locked';
 
   const penalty = pendingPenaltyFromInspection || 'ok';
   solves[currentIndex] = { rawMs: finalTime, penalty };
   renderSlots();
 
-  if (penalty === 'dnf') timerDisplay.textContent = 'DNF';
-  else timerDisplay.textContent = fmt(finalTime) + (penalty === 'plus2' ? '+' : '');
-
   pendingPenaltyFromInspection = null;
+  showRoundReview();
+}
+
+function showRoundReview() {
+  const s = solves[currentIndex];
+  document.getElementById('rrLabel').textContent = `${currentIndex + 1}회 기록`;
+  renderRoundReviewTime();
+  timerDisplay.textContent = '0.00';
+  timerHint.textContent = '아래에서 결과를 확인하고 다음으로 넘어가세요';
+  document.getElementById('roundReview').classList.add('show');
+}
+
+function renderRoundReviewTime() {
+  const s = solves[currentIndex];
+  const eff = effectiveSeconds(s);
+  document.getElementById('rrTime').textContent = s.penalty === 'dnf' ? 'DNF' : eff.toFixed(2) + '초';
+  document.querySelectorAll('#rrPenalties button').forEach((btn) => {
+    btn.classList.toggle('on', btn.getAttribute('data-p') === s.penalty);
+  });
+}
+
+document.querySelectorAll('#rrPenalties button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    solves[currentIndex].penalty = btn.getAttribute('data-p');
+    renderRoundReviewTime();
+    renderSlots();
+  });
+});
+
+document.getElementById('rrNextBtn').addEventListener('click', () => {
+  document.getElementById('roundReview').classList.remove('show');
   currentIndex++;
+  state = 'idle';
+  timerBox.className = 'timer-box';
   if (currentIndex < 5) {
     updateScrambleDisplay();
-    timerHint.textContent = `${currentIndex}/5 완료! 스페이스바를 눌렀다 떼면 다음 미리보기 시작`;
+    timerHint.textContent = isTouchDevice() ? '화면을 눌렀다 떼면 다음 미리보기 시작' : '스페이스바를 눌렀다 떼면 다음 미리보기 시작';
   } else {
-    timerHint.textContent = '5회 측정 완료!';
     document.getElementById('scrambleLabel').textContent = '완료';
-    document.getElementById('scrambleText').textContent = '아래에서 결과를 확인하고 필요하면 +2/DNF를 조정해주세요.';
+    document.getElementById('scrambleText').textContent = '5회 측정이 모두 끝났어요.';
     computeAndShowAverage();
   }
-}
+});
 
 function tickTimer() {
   timerDisplay.textContent = fmt(performance.now() - startTime);
