@@ -160,7 +160,7 @@
         <thead>
           <tr>
             <th>결제확인</th>
-            <th>날짜</th>
+            <th>날짜/반</th>
             <th>시간</th>
             <th>이름</th>
             <th>연락처</th>
@@ -180,7 +180,8 @@
       진짜 보안이 필요하면 이 URL 자체를 외부에 공유하지 않는 방식으로 관리해주세요.<br>
       "상태"가 <b>대기중(만료가능)</b>으로 표시된 건 15분 홀드 시간이 지났지만 데이터가 아직 DB에 남아있는 예약이에요 — 슬롯 자체는 이미 재오픈된 상태입니다.<br>
       <b>결제확인 체크박스</b>는 실제 Firebase 데이터의 status 값을 confirmed로 바꿔서, 해당 시간대가 영구적으로 잠기도록(이중예약 방지) 만들어요. 체크 즉시 예약 위젯에도 반영돼요.<br>
-      <b style="color:#D01C28;">⚠️중복</b> 표시는 같은 연락처로 미결제 예약이 여러 건 있다는 뜻이에요. 이땐 아임웹 주문 생성 시각과, 이 표의 "예약접수 시각" 중 <b>가장 가까운 시각의 건</b>이 실제 결제된 예약일 확률이 높아요 (고객은 보통 예약 직후 바로 결제 페이지로 넘어가기 때문).
+      <b style="color:#D01C28;">⚠️중복</b> 표시는 같은 연락처로 미결제 예약이 여러 건 있다는 뜻이에요. 이땐 아임웹 주문 생성 시각과, 이 표의 "예약접수 시각" 중 <b>가장 가까운 시각의 건</b>이 실제 결제된 예약일 확률이 높아요 (고객은 보통 예약 직후 바로 결제 페이지로 넘어가기 때문).<br>
+      <b>"날짜/반"</b> 열은 원데이클래스처럼 날짜기반 강의는 실제 날짜(YYYY-MM-DD)가, 정규반처럼 요일반 기반(rolling capacity) 강의는 "월요일반" 같은 반 이름이 표시돼요. 반 기반 강의는 특정 날짜가 아니라 그 반 자체에 정원이 걸려있어서 날짜 개념이 없어요.
     </footer>
   </main>
 </div>
@@ -198,6 +199,15 @@ let allBookingsFlat = []; // {courseId, date, time, id, name, phone, email, stat
 
 function bookingKeyOf(b) {
   return `${b.courseId}__${b.date}__${b.time}__${b.id}`;
+}
+
+// 반(요일) 기반 강의일 때, classKey("mon" 등)를 사람이 읽을 수 있는 라벨("월요일반")로 변환
+function displayDateOf(b) {
+  const course = allCourses[b.courseId];
+  if (course && course.mode === 'recurring' && course.classes && course.classes[b.date]) {
+    return course.classes[b.date].label + ` (${b.date})`;
+  }
+  return b.date;
 }
 
 async function togglePaid(bookingKey, checkbox) {
@@ -410,7 +420,7 @@ function renderTable(list) {
     return `
       <tr style="${isPaid ? 'background:#F3FBF5;' : ''}">
         <td><input type="checkbox" ${isPaid ? 'checked' : ''} onchange="togglePaid('${key}', this)" style="width:18px; height:18px; cursor:pointer;" /></td>
-        <td>${b.date}</td>
+        <td>${displayDateOf(b)}</td>
         <td>${b.time}</td>
         <td>${b.name}</td>
         <td>${b.phone}${dupWarning}</td>
@@ -444,10 +454,10 @@ function downloadCSV() {
   });
   filtered.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
-  const header = ['결제확인','날짜','시간','이름','연락처','이메일','상태','예약접수시각','강의ID'];
+  const header = ['결제확인','날짜/반','시간','이름','연락처','이메일','상태','예약접수시각','강의ID'];
   const rows = filtered.map(b => [
     b.status === 'confirmed' ? 'O' : '',
-    b.date, b.time, b.name, b.phone, b.email,
+    displayDateOf(b), b.time, b.name, b.phone, b.email,
     b.status === 'confirmed' ? '결제확정' : ((b.status === 'pending' && isExpiredPending(b)) ? '대기중(만료가능)' : (b.status || '알수없음')),
     b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '',
     b.courseId
