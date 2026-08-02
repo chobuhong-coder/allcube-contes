@@ -44,14 +44,15 @@
     text-align: center; margin-bottom: 20px; user-select: none;
     transition: background 0.15s ease;
   }
-  .timer-box.ready { background: #FFC844; }
+  .timer-box.inspecting { background: linear-gradient(165deg,#123a6e,#0B1834); }
+  .timer-box.inspecting.warn { background: linear-gradient(165deg,#5a3a12,#3a2410); }
+  .timer-box.inspecting.danger { background: linear-gradient(165deg,#5a1e1e,#3a1212); }
   .timer-box.running { background: #159B4E; }
   .timer-box.locked { background: #ccc; }
   .timer-display { font-family: 'Courier New', monospace; font-size: 56px; font-weight: 800; color: #fff; }
   .timer-box.ready .timer-display, .timer-box.locked .timer-display { color: #0B1834; }
   .timer-hint { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 12px; }
   .timer-box.ready .timer-hint, .timer-box.locked .timer-hint { color: rgba(11,24,52,0.6); }
-
   /* ---- 5회 기록 슬롯 ---- */
   .slots {
     display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px;
@@ -128,7 +129,7 @@
 <body>
 <div class="wrap">
 
-  <div class="notice-bar">이 페이지는 로그인한 플레이올큐브 회원만 볼 수 있어요. 5회 측정 후 최고/최저 기록을 제외한 평균(Ao5)으로 순위가 매겨져요.</div>
+  <div class="notice-bar">5회 측정 후 최고/최저 기록을 제외한 평균(Ao5)으로 순위가 매겨져요.</div>
 
   <div class="header">
     <div class="badge">위클리 콘테스트 · Ao5</div>
@@ -143,7 +144,7 @@
 
   <div class="timer-box" id="timerBox">
     <div class="timer-display" id="timerDisplay">0.00</div>
-    <div class="timer-hint" id="timerHint">스페이스바를 꾹 눌렀다 떼면 시작해요 (모바일은 탭)</div>
+    <div class="timer-hint" id="timerHint">스페이스바를 눌렀다 떼면 미리보기(15초) 시작 (모바일은 탭)</div>
   </div>
 
   <div class="slots" id="slots"></div>
@@ -153,7 +154,6 @@
     <div class="result-sub" id="resultSub"></div>
     <input type="text" id="nicknameInput" placeholder="닉네임 (랭킹에 표시돼요)" maxlength="20">
     <button class="primary" id="submitBtn">이 평균으로 제출하기</button>
-    <button class="secondary" id="resetBtn">처음부터 다시 (5회 재도전)</button>
     <div class="submit-msg" id="submitMsg"></div>
   </div>
 
@@ -178,7 +178,6 @@ let solves = [null, null, null, null, null];
 let currentIndex = 0;
 
 let state = 'idle';
-let holdTimer = null;
 let startTime = null;
 let rafId = null;
 let finalTime = 0;
@@ -348,69 +347,124 @@ const resultTime = document.getElementById('resultTime');
 const resultSub = document.getElementById('resultSub');
 const nicknameInput = document.getElementById('nicknameInput');
 const submitBtn = document.getElementById('submitBtn');
-const resetBtn = document.getElementById('resetBtn');
 const submitMsg = document.getElementById('submitMsg');
 
 nicknameInput.value = localStorage.getItem(NICKNAME_KEY) || '';
 
-function armReady() {
+// ---------- 인스펙션(15초 미리보기) 포함 타이머 ----------
+const INSPECTION_MS = 15000;
+let inspectionStart = 0;
+let pendingPenaltyFromInspection = null; // 'ok' | 'plus2' | 'dnf'
+let announced8 = false;
+let announced12 = false;
+
+function isTouchDevice() {
+  return window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+}
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = 1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function handleTap() {
   if (alreadySubmittedToday) return;
   if (currentIndex >= 5) return;
-  if (state !== 'idle') return;
-  state = 'holding';
-  holdTimer = setTimeout(() => {
-    if (state === 'holding') {
-      state = 'ready';
-      timerBox.classList.add('ready');
-      timerHint.textContent = '손을 떼면 시작해요!';
-    }
-  }, 300);
-}
-function cancelHold() {
-  if (alreadySubmittedToday) return;
-  if (currentIndex >= 5) return;
-  clearTimeout(holdTimer);
-  if (state === 'holding') { state = 'idle'; return; }
-  if (state === 'ready') {
-    state = 'running';
-    timerBox.classList.remove('ready');
-    timerBox.classList.add('running');
-    timerHint.textContent = '눌러서 정지';
-    startTime = performance.now();
-    tickTimer();
-    return;
-  }
-  if (state === 'running') {
-    finalTime = performance.now() - startTime;
-    cancelAnimationFrame(rafId);
-    state = 'idle';
-    timerBox.classList.remove('running');
-    timerDisplay.textContent = '0.00';
-
-    solves[currentIndex] = { rawMs: finalTime, penalty: 'ok' };
-    renderSlots();
-
-    currentIndex++;
-    if (currentIndex < 5) {
-      updateScrambleDisplay();
-      timerHint.textContent = `${currentIndex}/5 완료! 스페이스바를 꾹 눌렀다 떼면 다음 스크램블 시작`;
-    } else {
-      timerHint.textContent = '5회 측정 완료!';
-      document.getElementById('scrambleLabel').textContent = '완료';
-      document.getElementById('scrambleText').textContent = '아래에서 결과를 확인하고 필요하면 +2/DNF를 조정해주세요.';
-      computeAndShowAverage();
-    }
+  if (state === 'idle') {
+    startInspection();
+  } else if (state === 'inspecting') {
+    startSolve();
+  } else if (state === 'running') {
+    stopSolve();
   }
 }
+
+function startInspection() {
+  state = 'inspecting';
+  inspectionStart = performance.now();
+  pendingPenaltyFromInspection = 'ok';
+  announced8 = false;
+  announced12 = false;
+  timerBox.className = 'timer-box inspecting';
+  timerHint.textContent = isTouchDevice() ? '화면을 다시 눌렀다 떼면 시작' : '스페이스바를 다시 눌렀다 떼면 시작';
+  tickInspection();
+}
+
+function tickInspection() {
+  if (state !== 'inspecting') return;
+  const elapsed = performance.now() - inspectionStart;
+  const remain = INSPECTION_MS - elapsed;
+  const remainSec = Math.ceil(remain / 1000);
+
+  if (!announced8 && elapsed >= 8000) { announced8 = true; speak('8초'); }
+  if (!announced12 && elapsed >= 12000) { announced12 = true; speak('12초'); }
+
+  if (remain <= -2000) {
+    pendingPenaltyFromInspection = 'dnf';
+    timerDisplay.textContent = 'DNF';
+    timerBox.className = 'timer-box inspecting danger';
+  } else if (remain <= 0) {
+    pendingPenaltyFromInspection = 'plus2';
+    timerDisplay.textContent = '+2';
+    timerBox.className = 'timer-box inspecting warn';
+  } else {
+    pendingPenaltyFromInspection = 'ok';
+    timerDisplay.textContent = String(remainSec);
+    timerBox.className = 'timer-box inspecting' + (remainSec <= 3 ? ' warn' : '');
+  }
+  rafId = requestAnimationFrame(tickInspection);
+}
+
+function startSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  state = 'running';
+  timerBox.className = 'timer-box running';
+  timerHint.textContent = isTouchDevice() ? '화면을 다시 누르면 정지' : '스페이스바를 다시 누르면 정지';
+  startTime = performance.now();
+  tickTimer();
+}
+
+function stopSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  finalTime = performance.now() - startTime;
+  state = 'idle';
+  timerBox.className = 'timer-box';
+
+  const penalty = pendingPenaltyFromInspection || 'ok';
+  solves[currentIndex] = { rawMs: finalTime, penalty };
+  renderSlots();
+
+  if (penalty === 'dnf') timerDisplay.textContent = 'DNF';
+  else timerDisplay.textContent = fmt(finalTime) + (penalty === 'plus2' ? '+' : '');
+
+  pendingPenaltyFromInspection = null;
+  currentIndex++;
+  if (currentIndex < 5) {
+    updateScrambleDisplay();
+    timerHint.textContent = `${currentIndex}/5 완료! 스페이스바를 눌렀다 떼면 다음 미리보기 시작`;
+  } else {
+    timerHint.textContent = '5회 측정 완료!';
+    document.getElementById('scrambleLabel').textContent = '완료';
+    document.getElementById('scrambleText').textContent = '아래에서 결과를 확인하고 필요하면 +2/DNF를 조정해주세요.';
+    computeAndShowAverage();
+  }
+}
+
 function tickTimer() {
   timerDisplay.textContent = fmt(performance.now() - startTime);
   rafId = requestAnimationFrame(tickTimer);
 }
 
-document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); armReady(); } });
-document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventDefault(); cancelHold(); } });
-timerBox.addEventListener('touchstart', (e) => { e.preventDefault(); armReady(); });
-timerBox.addEventListener('touchend', (e) => { e.preventDefault(); cancelHold(); });
+document.addEventListener('keydown', (e) => { if (e.code === 'Space') e.preventDefault(); });
+document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventDefault(); handleTap(); } });
+timerBox.addEventListener('touchstart', (e) => { e.preventDefault(); });
+timerBox.addEventListener('touchend', (e) => { e.preventDefault(); handleTap(); });
 
 function computeAndShowAverage() {
   if (!solves.every(s => s)) return;
@@ -421,7 +475,6 @@ function computeAndShowAverage() {
     submitBox.classList.add('show');
     resultTime.textContent = 'DNF';
     resultSub.textContent = 'DNF(실패)가 2개 이상이라 이번 주 이 Ao5 시도는 DNF로 확정돼요. 오늘은 여기까지예요.';
-    resetBtn.style.display = 'none';
     submitBtn.textContent = 'DNF로 오늘 기록 제출하기';
     submitBtn.disabled = false;
     finalAvgSeconds = 'DNF';
@@ -436,23 +489,10 @@ function computeAndShowAverage() {
   submitBox.classList.add('show');
   resultTime.textContent = `Ao5: ${avg.toFixed(2)}초`;
   resultSub.textContent = `기록: ${effs.map(v => v === Infinity ? 'DNF' : v.toFixed(2)).join(' / ')} (최고·최저 제외 평균)`;
-  resetBtn.style.display = 'block';
   submitBtn.textContent = '이 평균으로 제출하기';
   submitBtn.disabled = false;
   submitMsg.textContent = '';
 }
-
-resetBtn.addEventListener('click', () => {
-  if (alreadySubmittedToday) return;
-  solves = [null, null, null, null, null];
-  currentIndex = 0;
-  finalAvgSeconds = null;
-  submitBox.classList.remove('show');
-  submitMsg.textContent = '';
-  document.getElementById('scrambleLabel').textContent = '1번째 스크램블';
-  updateScrambleDisplay();
-  renderSlots();
-});
 
 submitBtn.addEventListener('click', async () => {
   const nickname = nicknameInput.value.trim();
@@ -483,7 +523,6 @@ submitBtn.addEventListener('click', async () => {
     }
     alreadySubmittedToday = true;
     if (isDnf) lockTimerDnf(); else lockTimer(finalAvgSeconds);
-    resetBtn.style.display = 'none';
     submitMsg.textContent = isDnf ? '오늘 시도가 DNF로 기록됐어요. 내일 다시 도전해보세요.' : 'Ao5 기록이 등록됐어요! 내일 또 도전해보세요.';
     renderSlots();
     loadLeaderboard();
