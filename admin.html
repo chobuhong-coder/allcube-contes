@@ -227,7 +227,7 @@ async function togglePaid(bookingKey, checkbox) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${res.status}`);
+      throw new Error((err.error || `HTTP ${res.status}`) + (err.detail ? ` / ${err.detail}` : ''));
     }
 
     // 로컬 데이터도 즉시 반영해서 화면을 다시 그림
