@@ -45,7 +45,7 @@
   #lockError { color: #D01C28; font-size: 13px; margin-top: 8px; min-height: 18px; }
 
   /* 본문 */
-  #app { display: none; }
+  #app { display: block; }
   header {
     background: var(--navy); color: white; padding: 20px 24px;
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
@@ -110,16 +110,6 @@
 </style>
 </head>
 <body>
-
-<div id="lockScreen">
-  <div id="lockBox">
-    <h2>🔒 관리자 접속</h2>
-    <p>PLAY ALLCUBE 예약 조회 페이지</p>
-    <input type="password" id="pwInput" placeholder="비밀번호 입력" />
-    <button onclick="tryUnlock()">입장하기</button>
-    <div id="lockError"></div>
-  </div>
-</div>
 
 <div id="app">
   <header>
@@ -189,14 +179,14 @@
       ⚠️ 이 페이지는 간단한 화면 잠금만 적용되어 있어요. Firebase 보안 규칙상 예약 데이터(bookings)는 누구나 읽을 수 있게 설정되어 있으므로,<br>
       진짜 보안이 필요하면 이 URL 자체를 외부에 공유하지 않는 방식으로 관리해주세요.<br>
       "상태"가 <b>대기중(만료가능)</b>으로 표시된 건 15분 홀드 시간이 지났지만 데이터가 아직 DB에 남아있는 예약이에요 — 슬롯 자체는 이미 재오픈된 상태입니다.<br>
-      <b>결제확인 체크박스</b>는 실제 Firebase 데이터의 status 값을 confirmed로 바꿔서, 해당 시간대가 영구적으로 잠기도록(이중예약 방지) 만들어요. 체크 즉시 예약 위젯에도 반영돼요.
+      <b>결제확인 체크박스</b>는 실제 Firebase 데이터의 status 값을 confirmed로 바꿔서, 해당 시간대가 영구적으로 잠기도록(이중예약 방지) 만들어요. 체크 즉시 예약 위젯에도 반영돼요.<br>
+      <b style="color:#D01C28;">⚠️중복</b> 표시는 같은 연락처로 미결제 예약이 여러 건 있다는 뜻이에요. 이땐 아임웹 주문 생성 시각과, 이 표의 "예약접수 시각" 중 <b>가장 가까운 시각의 건</b>이 실제 결제된 예약일 확률이 높아요 (고객은 보통 예약 직후 바로 결제 페이지로 넘어가기 때문).
     </footer>
   </main>
 </div>
 
 <script>
 const DB_URL = "https://allcube-booking-default-rtdb.firebaseio.com";
-const ADMIN_PASSWORD = "allcube2026"; // 필요시 이 값만 바꿔서 비밀번호 변경 가능
 
 // 결제확인 체크박스를 실제로 Firebase에 반영하기 위한 Worker 설정
 // 아래 두 값은 Cloudflare Worker 배포 후 실제 값으로 바꿔주세요.
@@ -242,20 +232,6 @@ async function togglePaid(bookingKey, checkbox) {
   }
 }
 
-function tryUnlock() {
-  const input = document.getElementById('pwInput').value;
-  if (input === ADMIN_PASSWORD) {
-    document.getElementById('lockScreen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    init();
-  } else {
-    document.getElementById('lockError').textContent = '비밀번호가 올바르지 않습니다.';
-  }
-}
-document.getElementById('pwInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') tryUnlock();
-});
-
 async function init() {
   await loadData();
   document.getElementById('courseSelect').addEventListener('change', render);
@@ -264,6 +240,8 @@ async function init() {
   document.getElementById('searchInput').addEventListener('input', render);
   document.getElementById('paidFilter').addEventListener('change', render);
 }
+init();
+
 
 async function loadData() {
   document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="loading">불러오는 중...</td></tr>';
@@ -402,6 +380,15 @@ function renderTable(list) {
     return;
   }
 
+  // 같은 전화번호로 미결제(pending) 예약이 여러 건인 경우를 감지 (결제 매칭 시 주의 필요)
+  const phoneCounts = {};
+  allBookingsFlat.forEach(b => {
+    if (b.status === 'pending') {
+      const p = (b.phone || '').replace(/[^0-9]/g, '');
+      if (p) phoneCounts[p] = (phoneCounts[p] || 0) + 1;
+    }
+  });
+
   tbody.innerHTML = list.map(b => {
     let statusHtml;
     if (b.status === 'confirmed') {
@@ -416,13 +403,17 @@ function renderTable(list) {
     const bookedAtDisplay = b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '-';
     const key = bookingKeyOf(b);
     const isPaid = b.status === 'confirmed';
+    const phoneNorm = (b.phone || '').replace(/[^0-9]/g, '');
+    const dupWarning = (b.status === 'pending' && phoneNorm && phoneCounts[phoneNorm] > 1)
+      ? ' <span title="이 연락처로 미결제 예약이 여러 건 있어요. 아임웹 주문시각과 예약접수시각이 가장 가까운 건을 결제건으로 판단하세요." style="color:#D01C28;font-weight:800;cursor:help;">⚠️중복</span>'
+      : '';
     return `
       <tr style="${isPaid ? 'background:#F3FBF5;' : ''}">
         <td><input type="checkbox" ${isPaid ? 'checked' : ''} onchange="togglePaid('${key}', this)" style="width:18px; height:18px; cursor:pointer;" /></td>
         <td>${b.date}</td>
         <td>${b.time}</td>
         <td>${b.name}</td>
-        <td>${b.phone}</td>
+        <td>${b.phone}${dupWarning}</td>
         <td>${b.email || '-'}</td>
         <td>${statusHtml}</td>
         <td>${bookedAtDisplay}</td>
