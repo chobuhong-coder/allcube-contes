@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="ko">
+html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,44 +11,19 @@
   }
   .wrap { max-width: 640px; margin: 0 auto; }
 
-  /* ---- 로그인/회원가입 ---- */
-  .auth-box {
-    background: #fff; border-radius: 20px; padding: 32px 24px;
-    box-shadow: 0 4px 16px rgba(11,24,52,0.08); max-width: 380px; margin: 40px auto;
-  }
-  .auth-box h1 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
-  .auth-box .sub { font-size: 13px; color: #888; margin-bottom: 20px; }
-  .auth-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-  .auth-tabs button {
-    flex: 1; padding: 10px; border: 1px solid #E5E7EB; background: #fff;
-    border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; color: #999;
-  }
-  .auth-tabs button.active { background: #0B1834; color: #fff; border-color: #0B1834; }
-  .auth-box input {
-    width: 100%; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 10px;
-    font-size: 15px; margin-bottom: 10px;
-  }
-  .auth-box button.submit {
-    width: 100%; padding: 14px; border: none; border-radius: 10px;
-    background: #2F6BFF; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
-  }
-  .auth-box button.submit:disabled { background: #ccc; }
-  .auth-msg { font-size: 13px; margin-top: 10px; color: #D01C28; min-height: 18px; }
-
-  /* ---- 콘테스트 화면 ---- */
-  .contest-area { display: none; }
-  .contest-area.show { display: block; }
-
+  /* ---- 상단 사용자 상태 바 ---- */
   .user-bar {
     display: flex; align-items: center; justify-content: space-between;
     background: #fff; border-radius: 14px; padding: 12px 16px; margin-bottom: 16px;
-    box-shadow: 0 4px 16px rgba(11,24,52,0.06); font-size: 14px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.06); font-size: 14px; gap: 8px;
   }
   .user-bar .name { font-weight: 700; }
-  .user-bar button {
-    background: none; border: none; color: #999; font-size: 13px; cursor: pointer;
-    text-decoration: underline;
+  .user-bar .guest-msg { color: #888; }
+  .user-bar button, .user-bar a.link-btn {
+    background: none; border: none; color: #2F6BFF; font-size: 13px; cursor: pointer;
+    font-weight: 700; white-space: nowrap;
   }
+  .user-bar .logout-btn { color: #999; font-weight: 400; text-decoration: underline; }
 
   .header {
     background: linear-gradient(135deg, #0B1834 0%, #142954 100%);
@@ -86,18 +60,37 @@
   .timer-hint { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 12px; }
   .timer-box.ready .timer-hint, .timer-box.locked .timer-hint { color: rgba(11,24,52,0.6); }
 
+  /* ---- 결과 / 제출 / 로그인 박스 ---- */
   .submit-box {
     background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
     box-shadow: 0 4px 16px rgba(11,24,52,0.08); display: none;
   }
   .submit-box.show { display: block; }
   .submit-box .result-time { font-size: 28px; font-weight: 800; margin-bottom: 14px; }
-  .submit-box button {
+  .submit-box button.primary {
     width: 100%; padding: 14px; border: none; border-radius: 10px;
     background: #2F6BFF; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
   }
-  .submit-box button:disabled { background: #ccc; cursor: not-allowed; }
+  .submit-box button.primary:disabled { background: #ccc; cursor: not-allowed; }
   .submit-msg { font-size: 13px; margin-top: 8px; color: #159B4E; }
+
+  /* 게스트가 제출하려 할 때 나타나는 인라인 로그인 폼 */
+  .inline-auth { display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid #F0F1F3; }
+  .inline-auth.show { display: block; }
+  .inline-auth .notice {
+    font-size: 13px; color: #666; margin-bottom: 12px; line-height: 1.5;
+  }
+  .auth-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .auth-tabs button {
+    flex: 1; padding: 10px; border: 1px solid #E5E7EB; background: #fff;
+    border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; color: #999;
+  }
+  .auth-tabs button.active { background: #0B1834; color: #fff; border-color: #0B1834; }
+  .inline-auth input {
+    width: 100%; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 10px;
+    font-size: 15px; margin-bottom: 10px;
+  }
+  .auth-msg { font-size: 13px; margin-top: 8px; color: #D01C28; min-height: 18px; }
 
   .leaderboard {
     background: #fff; border-radius: 16px; padding: 20px;
@@ -125,53 +118,48 @@
 <body>
 <div class="wrap">
 
-  <!-- 로그인 / 회원가입 -->
-  <div class="auth-box" id="authBox">
-    <h1>위클리 콘테스트</h1>
-    <div class="sub">참여하려면 로그인이 필요해요</div>
-    <div class="auth-tabs">
-      <button id="tabLogin" class="active">로그인</button>
-      <button id="tabSignup">회원가입</button>
-    </div>
-    <input type="text" id="authId" placeholder="아이디 (영문/숫자, 랭킹에 표시돼요)" maxlength="20">
-    <input type="password" id="authPw" placeholder="비밀번호 (6자 이상)">
-    <button class="submit" id="authSubmit">로그인</button>
-    <div class="auth-msg" id="authMsg"></div>
+  <div class="user-bar" id="userBar">
+    <span class="guest-msg">게스트로 체험 중 · 기록을 랭킹에 올리려면 로그인하세요</span>
   </div>
 
-  <!-- 콘테스트 -->
-  <div class="contest-area" id="contestArea">
-    <div class="user-bar">
-      <div><span class="name" id="userNameDisplay"></span>님, 환영해요!</div>
-      <button id="logoutBtn">로그아웃</button>
-    </div>
+  <div class="header">
+    <div class="badge">위클리 콘테스트</div>
+    <h1 id="weekTitle">이번 주 종목</h1>
+    <div class="countdown" id="countdown">마감까지 계산 중...</div>
+  </div>
 
-    <div class="header">
-      <div class="badge">위클리 콘테스트</div>
-      <h1 id="weekTitle">이번 주 종목</h1>
-      <div class="countdown" id="countdown">마감까지 계산 중...</div>
-    </div>
+  <div class="scramble-box">
+    <div class="label">SCRAMBLE</div>
+    <div class="text" id="scrambleText">불러오는 중...</div>
+  </div>
 
-    <div class="scramble-box">
-      <div class="label">SCRAMBLE</div>
-      <div class="text" id="scrambleText">불러오는 중...</div>
-    </div>
+  <div class="timer-box" id="timerBox">
+    <div class="timer-display" id="timerDisplay">0.00</div>
+    <div class="timer-hint" id="timerHint">스페이스바를 꾹 눌렀다 떼면 시작해요 (모바일은 탭)</div>
+  </div>
 
-    <div class="timer-box" id="timerBox">
-      <div class="timer-display" id="timerDisplay">0.00</div>
-      <div class="timer-hint" id="timerHint">스페이스바를 꾹 눌렀다 떼면 시작해요 (모바일은 탭)</div>
-    </div>
+  <div class="submit-box" id="submitBox">
+    <div class="result-time" id="resultTime"></div>
+    <button class="primary" id="submitBtn">기록 제출하기</button>
+    <div class="submit-msg" id="submitMsg"></div>
 
-    <div class="submit-box" id="submitBox">
-      <div class="result-time" id="resultTime"></div>
-      <button id="submitBtn">이 기록으로 제출하기</button>
-      <div class="submit-msg" id="submitMsg"></div>
+    <!-- 게스트가 제출 시도할 때만 나타나는 인라인 로그인/회원가입 -->
+    <div class="inline-auth" id="inlineAuth">
+      <div class="notice">기록을 랭킹에 올리려면 로그인이 필요해요. 이미 아이디가 있다면 로그인, 처음이라면 회원가입해주세요.</div>
+      <div class="auth-tabs">
+        <button id="tabLogin" class="active">로그인</button>
+        <button id="tabSignup">회원가입</button>
+      </div>
+      <input type="text" id="authId" placeholder="아이디 (영문/숫자, 랭킹에 표시돼요)" maxlength="20">
+      <input type="password" id="authPw" placeholder="비밀번호 (6자 이상)">
+      <button class="primary" id="authSubmit">로그인하고 기록 제출</button>
+      <div class="auth-msg" id="authMsg"></div>
     </div>
+  </div>
 
-    <div class="leaderboard">
-      <h2>실시간 랭킹 (이번 주 최고 기록)</h2>
-      <div id="leaderboardList"><div class="lb-empty">불러오는 중...</div></div>
-    </div>
+  <div class="leaderboard">
+    <h2>실시간 랭킹 (이번 주 최고 기록)</h2>
+    <div id="leaderboardList"><div class="lb-empty">불러오는 중...</div></div>
   </div>
 </div>
 
@@ -182,7 +170,6 @@ const FAKE_DOMAIN = '@allcube.local';
 const AUTH_STORAGE_KEY = 'allcube_contest_auth';
 
 let session = null; // { idToken, refreshToken, uid, nickname, expiresAt }
-let currentContest = null;
 let weekKey = null;
 let todayKey = null;
 let alreadySubmittedToday = false;
@@ -203,58 +190,91 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---------- 인증 ----------
-let authMode = 'login';
-const tabLogin = document.getElementById('tabLogin');
-const tabSignup = document.getElementById('tabSignup');
-const authSubmit = document.getElementById('authSubmit');
-const authMsg = document.getElementById('authMsg');
-
-tabLogin.addEventListener('click', () => setAuthMode('login'));
-tabSignup.addEventListener('click', () => setAuthMode('signup'));
-function setAuthMode(mode) {
-  authMode = mode;
-  tabLogin.classList.toggle('active', mode === 'login');
-  tabSignup.classList.toggle('active', mode === 'signup');
-  authSubmit.textContent = mode === 'login' ? '로그인' : '회원가입';
-  authMsg.textContent = '';
+// ---------- 사용자 상태 바 ----------
+function renderUserBar() {
+  const bar = document.getElementById('userBar');
+  if (session) {
+    bar.innerHTML = `<span><span class="name">${escapeHtml(session.nickname)}</span>님, 환영해요!</span>
+      <button class="logout-btn" id="logoutBtn">로그아웃</button>`;
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      session = null;
+      alreadySubmittedToday = false;
+      renderUserBar();
+      // 타이머/제출 상태 초기화
+      document.getElementById('submitBox').classList.remove('show');
+      const box = document.getElementById('timerBox');
+      box.classList.remove('locked');
+      state = 'idle';
+    });
+  } else {
+    bar.innerHTML = `<span class="guest-msg">게스트로 체험 중 · 기록을 랭킹에 올리려면 로그인하세요</span>`;
+  }
 }
 
-authSubmit.addEventListener('click', async () => {
-  const rawId = document.getElementById('authId').value;
-  const pw = document.getElementById('authPw').value;
-  const id = sanitizeId(rawId);
+// ---------- 인증 (인라인) ----------
+let authMode = 'login';
+function bindAuthTabs() {
+  document.getElementById('tabLogin').addEventListener('click', () => setAuthMode('login'));
+  document.getElementById('tabSignup').addEventListener('click', () => setAuthMode('signup'));
+}
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+  document.getElementById('authSubmit').textContent = mode === 'login' ? '로그인하고 기록 제출' : '회원가입하고 기록 제출';
+  document.getElementById('authMsg').textContent = '';
+}
 
-  if (!id) { authMsg.textContent = '아이디는 영문/숫자만 입력해주세요.'; return; }
-  if (pw.length < 6) { authMsg.textContent = '비밀번호는 6자 이상이어야 해요.'; return; }
+function bindAuthSubmit() {
+  document.getElementById('authSubmit').addEventListener('click', async () => {
+    const authMsg = document.getElementById('authMsg');
+    const authSubmitBtn = document.getElementById('authSubmit');
+    const rawId = document.getElementById('authId').value;
+    const pw = document.getElementById('authPw').value;
+    const id = sanitizeId(rawId);
 
-  authSubmit.disabled = true;
-  authMsg.style.color = '#666';
-  authMsg.textContent = '처리 중...';
+    if (!id) { authMsg.textContent = '아이디는 영문/숫자만 입력해주세요.'; return; }
+    if (pw.length < 6) { authMsg.textContent = '비밀번호는 6자 이상이어야 해요.'; return; }
 
-  const endpoint = authMode === 'login' ? 'signInWithPassword' : 'signUp';
-  try {
-    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: id + FAKE_DOMAIN, password: pw, returnSecureToken: true })
-    });
-    const data = await res.json();
-    if (data.error) {
-      const msg = data.error.message;
-      if (msg === 'EMAIL_EXISTS') authMsg.textContent = '이미 있는 아이디예요. 로그인해주세요.';
-      else if (msg === 'EMAIL_NOT_FOUND' || msg === 'INVALID_PASSWORD' || msg === 'INVALID_LOGIN_CREDENTIALS') authMsg.textContent = '아이디 또는 비밀번호가 맞지 않아요.';
-      else authMsg.textContent = '오류가 발생했어요: ' + msg;
-      authSubmit.disabled = false;
-      return;
+    authSubmitBtn.disabled = true;
+    authMsg.style.color = '#666';
+    authMsg.textContent = '처리 중...';
+
+    const endpoint = authMode === 'login' ? 'signInWithPassword' : 'signUp';
+    try {
+      const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: id + FAKE_DOMAIN, password: pw, returnSecureToken: true })
+      });
+      const data = await res.json();
+      if (data.error) {
+        const msg = data.error.message;
+        if (msg === 'EMAIL_EXISTS') {
+          authMsg.textContent = '이미 있는 아이디예요. "로그인" 탭에서 로그인해주세요.';
+        } else if (msg === 'EMAIL_NOT_FOUND') {
+          authMsg.textContent = '아직 가입되지 않은 아이디예요. "회원가입" 탭에서 먼저 계정을 만들어주세요.';
+          setTimeout(() => setAuthMode('signup'), 1500);
+        } else if (msg === 'INVALID_PASSWORD' || msg === 'INVALID_LOGIN_CREDENTIALS') {
+          authMsg.textContent = '비밀번호가 맞지 않아요. 다시 확인해주세요.';
+        } else {
+          authMsg.textContent = '오류가 발생했어요: ' + msg;
+        }
+        authSubmitBtn.disabled = false;
+        return;
+      }
+      saveSession(data.idToken, data.refreshToken, data.localId, id, Number(data.expiresIn));
+      renderUserBar();
+      document.getElementById('inlineAuth').classList.remove('show');
+      // 로그인 성공 직후, 방금 측정한 기록을 바로 제출
+      await submitRecord();
+    } catch (e) {
+      authMsg.textContent = '네트워크 오류가 발생했어요.';
+      authSubmitBtn.disabled = false;
     }
-    saveSession(data.idToken, data.refreshToken, data.localId, id, Number(data.expiresIn));
-    enterContest();
-  } catch (e) {
-    authMsg.textContent = '네트워크 오류가 발생했어요.';
-    authSubmit.disabled = false;
-  }
-});
+  });
+}
 
 function saveSession(idToken, refreshToken, uid, nickname, expiresIn) {
   session = { idToken, refreshToken, uid, nickname, expiresAt: Date.now() + expiresIn * 1000 };
@@ -283,29 +303,15 @@ async function refreshSession() {
   } catch (e) { return false; }
 }
 
-document.getElementById('logoutBtn').addEventListener('click', () => {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
-  session = null;
-  document.getElementById('contestArea').classList.remove('show');
-  document.getElementById('authBox').style.display = 'block';
-});
-
 async function checkSession() {
   const saved = localStorage.getItem(AUTH_STORAGE_KEY);
   if (!saved) return false;
   session = JSON.parse(saved);
   if (Date.now() > session.expiresAt - 60000) {
     const ok = await refreshSession();
-    if (!ok) { localStorage.removeItem(AUTH_STORAGE_KEY); return false; }
+    if (!ok) { localStorage.removeItem(AUTH_STORAGE_KEY); session = null; return false; }
   }
   return true;
-}
-
-function enterContest() {
-  document.getElementById('authBox').style.display = 'none';
-  document.getElementById('contestArea').classList.add('show');
-  document.getElementById('userNameDisplay').textContent = session.nickname;
-  loadContest();
 }
 
 // ---------- 콘테스트 데이터 ----------
@@ -317,13 +323,11 @@ async function loadContest() {
       document.getElementById('scrambleText').textContent = '아직 이번 주 콘테스트가 등록되지 않았어요.';
       return;
     }
-    currentContest = data;
     weekKey = data.weekLabel;
     todayKey = todayDateKey();
     document.getElementById('weekTitle').textContent = `이번 주 종목: ${data.eventName || data.event}`;
     document.getElementById('scrambleText').textContent = data.scramble;
     startCountdown(data.endAt);
-    await checkTodaySubmission();
     loadLeaderboard();
   } catch (e) {
     document.getElementById('scrambleText').textContent = '콘테스트 정보를 불러오지 못했어요.';
@@ -331,6 +335,7 @@ async function loadContest() {
 }
 
 async function checkTodaySubmission() {
+  if (!session || !weekKey) return;
   try {
     const res = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}/${session.uid}/${todayKey}.json?auth=${session.idToken}`);
     const data = await res.json();
@@ -373,11 +378,9 @@ async function loadLeaderboard() {
       listEl.innerHTML = '<div class="lb-empty">아직 제출된 기록이 없어요. 첫 기록의 주인공이 되어보세요!</div>';
       return;
     }
-    // 유저별(uid) 여러 날짜 기록 중 베스트만 추출
     const bestByUser = Object.entries(data).map(([uid, days]) => {
       const dayEntries = Object.values(days);
-      const best = dayEntries.reduce((a, b) => (a.time < b.time ? a : b));
-      return best;
+      return dayEntries.reduce((a, b) => (a.time < b.time ? a : b));
     }).sort((a, b) => a.time - b.time);
 
     listEl.innerHTML = bestByUser.map((e, i) => {
@@ -399,6 +402,7 @@ const submitBox = document.getElementById('submitBox');
 const resultTime = document.getElementById('resultTime');
 const submitBtn = document.getElementById('submitBtn');
 const submitMsg = document.getElementById('submitMsg');
+const inlineAuth = document.getElementById('inlineAuth');
 
 function armReady() {
   if (alreadySubmittedToday) return;
@@ -431,7 +435,7 @@ function cancelHold() {
     state = 'stopped';
     timerBox.classList.remove('running');
     timerDisplay.textContent = fmt(finalTime);
-    timerHint.textContent = '아래에서 제출해주세요 (하루 1회만 가능)';
+    timerHint.textContent = '다시 누르면 재도전 (제출 전까지는 자유롭게 다시 잴 수 있어요)';
     showSubmit(finalTime);
   }
 }
@@ -443,6 +447,8 @@ function showSubmit(ms) {
   resultTime.textContent = `기록: ${fmt(ms)}초`;
   submitMsg.textContent = '';
   submitBtn.disabled = false;
+  submitBtn.style.display = 'block';
+  inlineAuth.classList.remove('show');
   submitBox.classList.add('show');
 }
 
@@ -451,7 +457,17 @@ document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventD
 timerBox.addEventListener('touchstart', (e) => { e.preventDefault(); armReady(); });
 timerBox.addEventListener('touchend', (e) => { e.preventDefault(); cancelHold(); });
 
+// "기록 제출하기" 클릭: 로그인 상태면 바로 제출, 게스트면 인라인 로그인 폼 노출
 submitBtn.addEventListener('click', async () => {
+  if (session) {
+    await submitRecord();
+  } else {
+    submitBtn.style.display = 'none';
+    inlineAuth.classList.add('show');
+  }
+});
+
+async function submitRecord() {
   if (!weekKey || !session) return;
   submitBtn.disabled = true;
   submitMsg.style.color = '#159B4E';
@@ -469,24 +485,34 @@ submitBtn.addEventListener('click', async () => {
       submitMsg.style.color = '#D01C28';
       submitMsg.textContent = '오늘은 이미 제출했거나 오류가 발생했어요.';
       submitBtn.disabled = false;
+      submitBtn.style.display = 'block';
       return;
     }
     alreadySubmittedToday = true;
     lockTimer(finalTime / 1000);
+    submitBtn.style.display = 'none';
     submitMsg.textContent = '기록이 등록됐어요! 내일 또 도전해보세요.';
     loadLeaderboard();
   } catch (e) {
     submitMsg.style.color = '#D01C28';
     submitMsg.textContent = '제출에 실패했어요. 다시 시도해주세요.';
     submitBtn.disabled = false;
+    submitBtn.style.display = 'block';
   }
-});
+}
 
 // ---------- 시작 ----------
+bindAuthTabs();
+bindAuthSubmit();
+renderUserBar();
+
 (async () => {
+  await loadContest();
   const ok = await checkSession();
-  if (ok) enterContest();
-  else document.getElementById('authBox').style.display = 'block';
+  if (ok) {
+    renderUserBar();
+    await checkTodaySubmission();
+  }
 })();
 
 setInterval(loadLeaderboard, 15000);
