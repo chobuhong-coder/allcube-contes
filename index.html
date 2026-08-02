@@ -1,139 +1,551 @@
-// ===== 매주 월요일 05:00(KST) 자동 실행: 스크램블 5개 생성 후 Firebase 등록 =====
-// Cron Trigger: 0 20 * * 0  (UTC 기준 일요일 20:00 = 한국시간 월요일 05:00)
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLAY ALLCUBE 위클리 콘테스트</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: #F7F8FA; color: #0B1834; padding: 20px; min-height: 100vh;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
 
+  .notice-bar {
+    background: #fff; border-radius: 14px; padding: 12px 16px; margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.06); font-size: 15.6px; font-weight: 700;
+    color: #888; text-align: center;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #0B1834 0%, #142954 100%);
+    border-radius: 20px; padding: 24px; color: #fff; margin-bottom: 20px;
+  }
+  .header .badge {
+    display: inline-block; background: #FFC844; color: #0B1834;
+    font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .header h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .header .countdown { font-size: 13px; color: rgba(255,255,255,0.7); }
+
+  .daily-warn {
+    background: #FFF8E1; border: 1px solid #FFE082; border-radius: 14px;
+    padding: 12px 16px; margin-bottom: 20px; font-size: 13.5px; color: #7A5C00;
+    line-height: 1.5; text-align: center;
+  }
+  .daily-warn b { color: #5C4400; }
+
+  .scramble-box {
+    background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08);
+  }
+  .scramble-box .label { font-size: 12px; font-weight: 700; color: #2F6BFF; margin-bottom: 8px; }
+  .scramble-box .text {
+    font-family: 'Courier New', monospace; font-size: 20px; font-weight: 700;
+    letter-spacing: 1px; line-height: 1.6; word-break: break-all;
+  }
+
+  .timer-box {
+    background: #0B1834; border-radius: 20px; padding: 40px 20px;
+    text-align: center; margin-bottom: 20px; user-select: none;
+    transition: background 0.15s ease;
+  }
+  .timer-box.inspecting { background: linear-gradient(165deg,#123a6e,#0B1834); }
+  .timer-box.inspecting.warn { background: linear-gradient(165deg,#5a3a12,#3a2410); }
+  .timer-box.inspecting.danger { background: linear-gradient(165deg,#5a1e1e,#3a1212); }
+  .timer-box.running { background: #159B4E; }
+  .timer-box.locked { background: #ccc; }
+  .timer-display { font-family: 'Courier New', monospace; font-size: 56px; font-weight: 800; color: #fff; }
+  .timer-box.ready .timer-display, .timer-box.locked .timer-display { color: #0B1834; }
+  .timer-hint { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 12px; }
+  .timer-box.ready .timer-hint, .timer-box.locked .timer-hint { color: rgba(11,24,52,0.6); }
+  /* ---- 5회 기록 슬롯 ---- */
+  .slots {
+    display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px;
+    margin-bottom: 20px;
+  }
+  .slot {
+    background: #fff; border-radius: 12px; padding: 10px 6px; text-align: center;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.06); min-width: 0;
+  }
+  .slot.active { box-shadow: 0 0 0 2px #2F6BFF; }
+  .slot .n { font-size: 11px; color: #999; margin-bottom: 4px; }
+  .slot .t { font-family: 'Courier New', monospace; font-weight: 700; font-size: 14px; margin-bottom: 6px; word-break: break-all; }
+  .slot .t.empty { color: #ccc; }
+  .slot .t.dnf { color: #D01C28; }
+  .slot .penalties { display: flex; gap: 3px; justify-content: center; }
+  .slot .penalties button {
+    flex: 1; font-size: 10px; padding: 3px 0; border-radius: 6px; border: 1px solid #E5E7EB;
+    background: #fff; color: #999; cursor: pointer;
+  }
+  .slot .penalties button.on { background: #0B1834; color: #fff; border-color: #0B1834; }
+  .slot .penalties button:disabled { opacity: 0.3; cursor: default; }
+
+  /* ---- 결과 / 제출 박스 ---- */
+  .submit-box {
+    background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08); display: none;
+  }
+  .submit-box.show { display: block; }
+  .submit-box .result-time { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+  .submit-box .result-sub { font-size: 13px; color: #888; margin-bottom: 14px; }
+  .submit-box input {
+    width: 100%; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 10px;
+    font-size: 15px; margin-bottom: 10px;
+  }
+  .submit-box button.primary {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    background: #2F6BFF; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+  .submit-box button.primary:disabled { background: #ccc; cursor: not-allowed; }
+  .submit-box button.secondary {
+    width: 100%; padding: 12px; border: none; border-radius: 10px; margin-top: 8px;
+    background: #F0F1F3; color: #666; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .submit-msg { font-size: 13px; margin-top: 8px; color: #159B4E; }
+
+  .leaderboard {
+    background: #fff; border-radius: 16px; padding: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08);
+  }
+  .leaderboard h2 { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
+  .lb-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid #F0F1F3; font-size: 14px;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank {
+    width: 28px; height: 28px; border-radius: 50%; background: #F0F1F3;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; color: #666; flex-shrink: 0;
+  }
+  .lb-row.top1 .lb-rank { background: #FFC844; color: #0B1834; }
+  .lb-row.top2 .lb-rank { background: #D9DDE3; color: #0B1834; }
+  .lb-row.top3 .lb-rank { background: #E8C9A0; color: #0B1834; }
+  .lb-name { flex: 1; font-weight: 600; }
+  .lb-time { font-family: 'Courier New', monospace; font-weight: 700; color: #2F6BFF; }
+  .lb-empty { color: #999; font-size: 14px; text-align: center; padding: 20px 0; }
+
+  @media (max-width: 480px) {
+    .slot .t { font-size: 12px; }
+    .slot .penalties button { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="notice-bar">5회 측정 후 최고/최저 기록을 제외한 평균(Ao5)으로 순위가 매겨져요.</div>
+
+  <div class="header">
+    <div class="badge">위클리 콘테스트 · Ao5</div>
+    <h1 id="weekTitle">이번 주 종목</h1>
+    <div class="countdown" id="countdown">마감까지 계산 중...</div>
+  </div>
+
+  <div class="daily-warn">⏰ 하루에 딱 <b>한 번만</b> 기록을 등록할 수 있어요! 5회 측정이 끝나면 그날은 다시 도전할 수 없으니, 마음의 준비가 됐을 때 시작해주세요 😊</div>
+
+  <div class="scramble-box">
+    <div class="label" id="scrambleLabel">1번째 스크램블</div>
+    <div class="text" id="scrambleText">불러오는 중...</div>
+  </div>
+
+  <div class="timer-box" id="timerBox">
+    <div class="timer-display" id="timerDisplay">0.00</div>
+    <div class="timer-hint" id="timerHint">스페이스바를 눌렀다 떼면 미리보기(15초) 시작 (모바일은 탭)</div>
+  </div>
+
+  <div class="slots" id="slots"></div>
+
+  <div class="submit-box" id="submitBox">
+    <div class="result-time" id="resultTime"></div>
+    <div class="result-sub" id="resultSub"></div>
+    <input type="text" id="nicknameInput" placeholder="닉네임 (랭킹에 표시돼요)" maxlength="20">
+    <button class="primary" id="submitBtn">이 평균으로 제출하기</button>
+    <div class="submit-msg" id="submitMsg"></div>
+  </div>
+
+  <div class="leaderboard">
+    <h2>실시간 랭킹 (이번 주 최고 Ao5)</h2>
+    <div id="leaderboardList"><div class="lb-empty">불러오는 중...</div></div>
+  </div>
+</div>
+
+<script>
 const DB_URL = 'https://allcube-booking-default-rtdb.firebaseio.com';
-const FACES = ['U', 'D', 'L', 'R', 'F', 'B'];
-const AXIS = { U: 'UD', D: 'UD', L: 'LR', R: 'LR', F: 'FB', B: 'FB' };
-const MODS = ['', "'", '2'];
+const DEVICE_ID_KEY = 'allcube_contest_device_id';
+const NICKNAME_KEY = 'allcube_contest_nickname';
 
-function randomScramble(length = 20) {
-  const seq = [];
-  let prevFace = null;
-  let prevAxis = null;
-  while (seq.length < length) {
-    const face = FACES[Math.floor(Math.random() * FACES.length)];
-    const axis = AXIS[face];
-    if (face === prevFace) continue;
-    if (axis === prevAxis) continue; // 같은 축(U/D, L/R, F/B) 연속 방지
-    const mod = MODS[Math.floor(Math.random() * MODS.length)];
-    seq.push(face + mod);
-    prevAxis = axis;
-    prevFace = face;
+let weekKey = null;
+let todayKey = null;
+let deviceId = null;
+let alreadySubmittedToday = false;
+let scrambles = [];
+
+let solves = [null, null, null, null, null];
+let currentIndex = 0;
+
+let state = 'idle';
+let startTime = null;
+let rafId = null;
+let finalTime = 0;
+let finalAvgSeconds = null;
+
+function fmt(ms) { return (ms / 1000).toFixed(2); }
+function todayDateKey() { return new Date().toLocaleDateString('en-CA'); }
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    localStorage.setItem(DEVICE_ID_KEY, id);
   }
-  return seq.join(' ');
+  return id;
 }
 
-function pad(n) { return String(n).padStart(2, '0'); }
-
-// UTC 시각에 9시간을 더한 뒤 UTC getter로 읽으면 "한국시간 기준 필드"를 얻을 수 있음
-function kstShifted(date) { return new Date(date.getTime() + 9 * 3600 * 1000); }
-function isoDateKST(d) { return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
-
-function base64url(input) {
-  let bytes;
-  if (typeof input === 'string') bytes = new TextEncoder().encode(input);
-  else bytes = new Uint8Array(input);
-  let str = '';
-  bytes.forEach((b) => { str += String.fromCharCode(b); });
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function pemToArrayBuffer(pem) {
-  const b64 = pem.replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s/g, '');
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-async function getGoogleAccessToken(saJson) {
-  const sa = JSON.parse(saJson);
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claims = {
-    iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600
-  };
-  const unsigned = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(claims))}`;
-
-  const keyData = pemToArrayBuffer(sa.private_key);
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8', keyData,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
-  );
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(unsigned)
-  );
-  const jwt = `${unsigned}.${base64url(signature)}`;
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
-  });
-  const data = await res.json();
-  if (!data.access_token) throw new Error('토큰 발급 실패: ' + JSON.stringify(data));
-  return data.access_token;
-}
-
-async function generateAndPublish(env) {
-  const monday = kstShifted(new Date()); // 트리거 시점이 이미 월요일 05시(KST)
-  const nextMonday = new Date(monday.getTime() + 7 * 86400000);
-
-  const weekLabel = isoDateKST(monday);
-  const startAt = `${isoDateKST(monday)}T05:00:00+09:00`;
-  const endAt = `${isoDateKST(nextMonday)}T05:00:00+09:00`;
-
-  const payload = {
-    weekLabel,
-    event: '333',
-    eventName: '3x3x3',
-    startAt,
-    endAt,
-    scramble1: randomScramble(),
-    scramble2: randomScramble(),
-    scramble3: randomScramble(),
-    scramble4: randomScramble(),
-    scramble5: randomScramble()
-  };
-
-  const accessToken = await getGoogleAccessToken(env.FIREBASE_SA_KEY);
-
-  const res = await fetch(`${DB_URL}/contests/current.json`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Firebase 쓰기 실패 (${res.status}): ${text}`);
-  }
-  return payload;
-}
-
-export default {
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(generateAndPublish(env));
-  },
-  // 대시보드에서 수동 테스트용 (Cron Triggers 탭의 "Trigger" 버튼으로도 테스트 가능)
-  async fetch(request, env) {
-    try {
-      const result = await generateAndPublish(env);
-      return new Response(JSON.stringify(result, null, 2), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (e) {
-      return new Response('오류: ' + e.message, { status: 500 });
+async function loadContest() {
+  try {
+    const res = await fetch(`${DB_URL}/contests/current.json`);
+    const data = await res.json();
+    if (!data) {
+      document.getElementById('scrambleText').textContent = '아직 이번 주 콘테스트가 등록되지 않았어요.';
+      return;
     }
+    weekKey = data.weekLabel;
+    todayKey = todayDateKey();
+    scrambles = [data.scramble1, data.scramble2, data.scramble3, data.scramble4, data.scramble5];
+    document.getElementById('weekTitle').textContent = `이번 주 종목: ${data.eventName || data.event}`;
+    startCountdown(data.endAt);
+    await checkTodaySubmission();
+    renderSlots();
+    updateScrambleDisplay();
+    loadLeaderboard();
+  } catch (e) {
+    document.getElementById('scrambleText').textContent = '콘테스트 정보를 불러오지 못했어요.';
   }
+}
+
+async function checkTodaySubmission() {
+  try {
+    const res = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}/${deviceId}/${todayKey}.json`);
+    const data = await res.json();
+    if (data) {
+      alreadySubmittedToday = true;
+      if (data.dnf) lockTimerDnf(); else lockTimer(data.time);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function lockTimer(time) {
+  const box = document.getElementById('timerBox');
+  box.classList.add('locked');
+  document.getElementById('timerDisplay').textContent = time.toFixed(2);
+  document.getElementById('timerHint').textContent = '오늘은 이미 참여했어요. 내일 다시 도전해보세요!';
+}
+
+function lockTimerDnf() {
+  const box = document.getElementById('timerBox');
+  box.classList.add('locked');
+  document.getElementById('timerDisplay').textContent = 'DNF';
+  document.getElementById('timerHint').textContent = '오늘 시도는 DNF로 마감됐어요. 내일 다시 도전해보세요!';
+}
+
+function startCountdown(endAt) {
+  const end = new Date(endAt).getTime();
+  const el = document.getElementById('countdown');
+  function tick() {
+    const diff = end - Date.now();
+    if (diff <= 0) { el.textContent = '이번 주 콘테스트가 마감되었어요'; return; }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    el.textContent = `마감까지 ${d}일 ${h}시간 ${m}분 남음`;
+  }
+  tick();
+  setInterval(tick, 60000);
+}
+
+async function loadLeaderboard() {
+  if (!weekKey) return;
+  try {
+    const res = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}.json`);
+    const data = await res.json();
+    const listEl = document.getElementById('leaderboardList');
+    if (!data) {
+      listEl.innerHTML = '<div class="lb-empty">아직 제출된 기록이 없어요. 첫 기록의 주인공이 되어보세요!</div>';
+      return;
+    }
+    const bestByUser = Object.entries(data).map(([id, days]) => {
+      const validEntries = Object.values(days).filter(e => !e.dnf && typeof e.time === 'number');
+      if (validEntries.length === 0) return null;
+      return validEntries.reduce((a, b) => (a.time < b.time ? a : b));
+    }).filter(e => e !== null).sort((a, b) => a.time - b.time);
+
+    listEl.innerHTML = bestByUser.map((e, i) => {
+      const rankClass = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+      return `<div class="lb-row ${rankClass}">
+        <div class="lb-rank">${i + 1}</div>
+        <div class="lb-name">${escapeHtml(e.nickname)}</div>
+        <div class="lb-time">${e.time.toFixed(2)}초</div>
+      </div>`;
+    }).join('');
+  } catch (e) { /* 다음 폴링에서 재시도 */ }
+}
+
+function updateScrambleDisplay() {
+  if (currentIndex >= 5) return;
+  document.getElementById('scrambleLabel').textContent = `${currentIndex + 1}번째 스크램블`;
+  document.getElementById('scrambleText').textContent = scrambles[currentIndex] || '스크램블 없음';
+}
+
+function renderSlots() {
+  const wrap = document.getElementById('slots');
+  wrap.innerHTML = solves.map((s, i) => {
+    const active = i === currentIndex && !alreadySubmittedToday ? 'active' : '';
+    let timeText = '<span class="t empty">--.--</span>';
+    let penaltiesHtml = `
+      <div class="penalties">
+        <button disabled>OK</button><button disabled>+2</button><button disabled>DNF</button>
+      </div>`;
+    if (s) {
+      const eff = effectiveSeconds(s);
+      if (s.penalty === 'dnf') {
+        timeText = `<span class="t dnf">DNF</span>`;
+      } else {
+        timeText = `<span class="t">${eff.toFixed(2)}</span>`;
+      }
+      penaltiesHtml = `
+        <div class="penalties">
+          <button class="${s.penalty === 'ok' ? 'on' : ''}" onclick="setPenalty(${i},'ok')">OK</button>
+          <button class="${s.penalty === 'plus2' ? 'on' : ''}" onclick="setPenalty(${i},'plus2')">+2</button>
+          <button class="${s.penalty === 'dnf' ? 'on' : ''}" onclick="setPenalty(${i},'dnf')">DNF</button>
+        </div>`;
+    }
+    return `<div class="slot ${active}">
+      <div class="n">${i + 1}회</div>
+      ${timeText}
+      ${penaltiesHtml}
+    </div>`;
+  }).join('');
+}
+
+function effectiveSeconds(s) {
+  if (s.penalty === 'dnf') return Infinity;
+  const base = s.rawMs / 1000;
+  return s.penalty === 'plus2' ? base + 2 : base;
+}
+
+window.setPenalty = function(i, penalty) {
+  if (alreadySubmittedToday) return;
+  if (!solves[i]) return;
+  solves[i].penalty = penalty;
+  renderSlots();
+  if (solves.every(s => s)) computeAndShowAverage();
 };
+
+const timerBox = document.getElementById('timerBox');
+const timerDisplay = document.getElementById('timerDisplay');
+const timerHint = document.getElementById('timerHint');
+const submitBox = document.getElementById('submitBox');
+const resultTime = document.getElementById('resultTime');
+const resultSub = document.getElementById('resultSub');
+const nicknameInput = document.getElementById('nicknameInput');
+const submitBtn = document.getElementById('submitBtn');
+const submitMsg = document.getElementById('submitMsg');
+
+nicknameInput.value = localStorage.getItem(NICKNAME_KEY) || '';
+
+// ---------- 인스펙션(15초 미리보기) 포함 타이머 ----------
+const INSPECTION_MS = 15000;
+let inspectionStart = 0;
+let pendingPenaltyFromInspection = null; // 'ok' | 'plus2' | 'dnf'
+let announced8 = false;
+let announced12 = false;
+
+function isTouchDevice() {
+  return window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+}
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = 1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function handleTap() {
+  if (alreadySubmittedToday) return;
+  if (currentIndex >= 5) return;
+  if (state === 'idle') {
+    startInspection();
+  } else if (state === 'inspecting') {
+    startSolve();
+  } else if (state === 'running') {
+    stopSolve();
+  }
+}
+
+function startInspection() {
+  state = 'inspecting';
+  inspectionStart = performance.now();
+  pendingPenaltyFromInspection = 'ok';
+  announced8 = false;
+  announced12 = false;
+  timerBox.className = 'timer-box inspecting';
+  timerHint.textContent = isTouchDevice() ? '화면을 다시 눌렀다 떼면 시작' : '스페이스바를 다시 눌렀다 떼면 시작';
+  tickInspection();
+}
+
+function tickInspection() {
+  if (state !== 'inspecting') return;
+  const elapsed = performance.now() - inspectionStart;
+  const remain = INSPECTION_MS - elapsed;
+  const remainSec = Math.ceil(remain / 1000);
+
+  if (!announced8 && elapsed >= 8000) { announced8 = true; speak('8초'); }
+  if (!announced12 && elapsed >= 12000) { announced12 = true; speak('12초'); }
+
+  if (remain <= -2000) {
+    pendingPenaltyFromInspection = 'dnf';
+    timerDisplay.textContent = 'DNF';
+    timerBox.className = 'timer-box inspecting danger';
+  } else if (remain <= 0) {
+    pendingPenaltyFromInspection = 'plus2';
+    timerDisplay.textContent = '+2';
+    timerBox.className = 'timer-box inspecting warn';
+  } else {
+    pendingPenaltyFromInspection = 'ok';
+    timerDisplay.textContent = String(remainSec);
+    timerBox.className = 'timer-box inspecting' + (remainSec <= 3 ? ' warn' : '');
+  }
+  rafId = requestAnimationFrame(tickInspection);
+}
+
+function startSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  state = 'running';
+  timerBox.className = 'timer-box running';
+  timerHint.textContent = isTouchDevice() ? '화면을 다시 누르면 정지' : '스페이스바를 다시 누르면 정지';
+  startTime = performance.now();
+  tickTimer();
+}
+
+function stopSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  finalTime = performance.now() - startTime;
+  state = 'idle';
+  timerBox.className = 'timer-box';
+
+  const penalty = pendingPenaltyFromInspection || 'ok';
+  solves[currentIndex] = { rawMs: finalTime, penalty };
+  renderSlots();
+
+  if (penalty === 'dnf') timerDisplay.textContent = 'DNF';
+  else timerDisplay.textContent = fmt(finalTime) + (penalty === 'plus2' ? '+' : '');
+
+  pendingPenaltyFromInspection = null;
+  currentIndex++;
+  if (currentIndex < 5) {
+    updateScrambleDisplay();
+    timerHint.textContent = `${currentIndex}/5 완료! 스페이스바를 눌렀다 떼면 다음 미리보기 시작`;
+  } else {
+    timerHint.textContent = '5회 측정 완료!';
+    document.getElementById('scrambleLabel').textContent = '완료';
+    document.getElementById('scrambleText').textContent = '아래에서 결과를 확인하고 필요하면 +2/DNF를 조정해주세요.';
+    computeAndShowAverage();
+  }
+}
+
+function tickTimer() {
+  timerDisplay.textContent = fmt(performance.now() - startTime);
+  rafId = requestAnimationFrame(tickTimer);
+}
+
+document.addEventListener('keydown', (e) => { if (e.code === 'Space') e.preventDefault(); });
+document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventDefault(); handleTap(); } });
+timerBox.addEventListener('touchstart', (e) => { e.preventDefault(); });
+timerBox.addEventListener('touchend', (e) => { e.preventDefault(); handleTap(); });
+
+function computeAndShowAverage() {
+  if (!solves.every(s => s)) return;
+  const effs = solves.map(effectiveSeconds);
+  const dnfCount = effs.filter(v => v === Infinity).length;
+
+  if (dnfCount >= 2) {
+    submitBox.classList.add('show');
+    resultTime.textContent = 'DNF';
+    resultSub.textContent = 'DNF(실패)가 2개 이상이라 이번 주 이 Ao5 시도는 DNF로 확정돼요. 오늘은 여기까지예요.';
+    submitBtn.textContent = 'DNF로 오늘 기록 제출하기';
+    submitBtn.disabled = false;
+    finalAvgSeconds = 'DNF';
+    return;
+  }
+
+  const sorted = [...effs].sort((a, b) => a - b);
+  const middle = sorted.slice(1, 4);
+  const avg = middle.reduce((a, b) => a + b, 0) / middle.length;
+
+  finalAvgSeconds = avg;
+  submitBox.classList.add('show');
+  resultTime.textContent = `Ao5: ${avg.toFixed(2)}초`;
+  resultSub.textContent = `기록: ${effs.map(v => v === Infinity ? 'DNF' : v.toFixed(2)).join(' / ')} (최고·최저 제외 평균)`;
+  submitBtn.textContent = '이 평균으로 제출하기';
+  submitBtn.disabled = false;
+  submitMsg.textContent = '';
+}
+
+submitBtn.addEventListener('click', async () => {
+  const nickname = nicknameInput.value.trim();
+  if (!nickname) { submitMsg.style.color = '#D01C28'; submitMsg.textContent = '닉네임을 입력해주세요.'; return; }
+  if (!weekKey || finalAvgSeconds === null) return;
+
+  const isDnf = finalAvgSeconds === 'DNF';
+  localStorage.setItem(NICKNAME_KEY, nickname);
+  submitBtn.disabled = true;
+  submitMsg.style.color = '#159B4E';
+  submitMsg.textContent = '제출 중...';
+
+  const body = isDnf
+    ? { nickname, dnf: true, submittedAt: new Date().toISOString() }
+    : { nickname, time: finalAvgSeconds, submittedAt: new Date().toISOString() };
+
+  try {
+    const res = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}/${deviceId}/${todayKey}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      submitMsg.style.color = '#D01C28';
+      submitMsg.textContent = '오늘은 이미 제출했거나 오류가 발생했어요.';
+      submitBtn.disabled = false;
+      return;
+    }
+    alreadySubmittedToday = true;
+    if (isDnf) lockTimerDnf(); else lockTimer(finalAvgSeconds);
+    submitMsg.textContent = isDnf ? '오늘 시도가 DNF로 기록됐어요. 내일 다시 도전해보세요.' : 'Ao5 기록이 등록됐어요! 내일 또 도전해보세요.';
+    renderSlots();
+    loadLeaderboard();
+  } catch (e) {
+    submitMsg.style.color = '#D01C28';
+    submitMsg.textContent = '제출에 실패했어요. 다시 시도해주세요.';
+    submitBtn.disabled = false;
+  }
+});
+
+deviceId = getOrCreateDeviceId();
+loadContest();
+setInterval(loadLeaderboard, 15000);
+</script>
+</body>
+</html>
