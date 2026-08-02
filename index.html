@@ -3,567 +3,794 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>올큐브 예약</title>
+<title>PLAY ALLCUBE 위클리 콘테스트</title>
 <style>
-  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
-  *{box-sizing:border-box;font-family:'Pretendard',system-ui,sans-serif;margin:0;padding:0}
-  body{background:#F7F7F5;color:#0F1E3D}
-  #wrap{max-width:520px;margin:0 auto;padding:32px 18px 60px}
-
-  .head{text-align:center;margin-bottom:28px}
-  .head h2{font-size:20px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px}
-  .head p{font-size:13px;color:#8b95a9}
-
-  .infoRow{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:28px}
-  .infoChip{background:#fff;border:1px solid #e7e2d6;border-radius:100px;padding:6px 13px;font-size:12px;font-weight:600;color:#4a5670}
-
-  .sectionTitle{font-size:13.5px;font-weight:800;color:#0B1834;margin:0 0 12px}
-
-  #calHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-  #calHead .calTitle{font-size:15px;font-weight:800}
-  #calHead button{
-    width:30px;height:30px;border-radius:50%;border:1px solid #e7e2d6;background:#fff;
-    cursor:pointer;font-size:14px;color:#4a5670;display:grid;place-items:center;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    background: #F7F8FA; color: #0B1834; padding: 20px; min-height: 100vh;
   }
-  #calHead button:disabled{opacity:.3;cursor:not-allowed}
-  #calHead button:hover:not(:disabled){border-color:#2F6BFF;color:#2F6BFF}
+  .wrap { max-width: 640px; margin: 0 auto; }
 
-  #calWeekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:6px}
-  #calWeekdays span{font-size:11.5px;font-weight:700;color:#8b95a9}
-
-  #calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:28px}
-  .calCell{
-    aspect-ratio:1;display:flex;align-items:center;justify-content:center;
-    border-radius:11px;font-size:13.5px;font-weight:700;cursor:pointer;
-    border:1px solid transparent;transition:.15s;color:#0F1E3D;
-  }
-  .calCell.empty{visibility:hidden;cursor:default}
-  .calCell.disabled{color:#c7cbd4;cursor:not-allowed}
-  .calCell:hover:not(.disabled):not(.on){border-color:#2F6BFF;background:#EAF1FF}
-  .calCell.today:not(.on){border-color:#2F6BFF;color:#2F6BFF}
-  .calCell.on{background:#0B1834;color:#fff}
-
-  #timeGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
-  .timeBtn{
-    padding:14px 6px;border-radius:12px;border:1px solid #e7e2d6;background:#fff;cursor:pointer;
-    text-align:center;transition:.15s;
-  }
-  .timeBtn .t{font-size:14.5px;font-weight:800}
-  .timeBtn .left{font-size:11px;color:#2F6BFF;font-weight:700;margin-top:3px}
-  .timeBtn:hover{border-color:#2F6BFF;transform:translateY(-2px)}
-  .timeBtn.full{opacity:.4;cursor:not-allowed;background:#f3f1ea}
-  .timeBtn.full:hover{transform:none;border-color:#e7e2d6}
-  .timeBtn.full .left{color:#b0b6c2}
-
-  /* 반(요일) 선택 카드 - 정규반처럼 특정 날짜가 아니라 요일반 자체에 정원이 걸리는 강의용 */
-  #classGrid{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
-  .classBtn{
-    padding:16px 18px;border-radius:14px;border:1px solid #e7e2d6;background:#fff;cursor:pointer;
-    display:flex;align-items:center;justify-content:space-between;transition:.15s;
-  }
-  .classBtn:hover{border-color:#2F6BFF;transform:translateY(-2px)}
-  .classBtn .label{font-size:15px;font-weight:800}
-  .classBtn .time{font-size:12.5px;color:#8b95a9;font-weight:600;margin-top:2px}
-  .classBtn .left{font-size:12.5px;color:#2F6BFF;font-weight:800}
-  .classBtn.full{opacity:.45;cursor:not-allowed;background:#f3f1ea}
-  .classBtn.full:hover{transform:none;border-color:#e7e2d6}
-  .classBtn.full .left{color:#b0b6c2}
-
-  #emptyMsg{font-size:13px;color:#9aa3b2;text-align:center;padding:20px 0}
-
-  /* modal */
-  .overlay{
-    position:fixed;inset:0;background:rgba(11,24,52,0.55);display:none;
-    align-items:center;justify-content:center;z-index:50;padding:20px;
-  }
-  .overlay.on{display:flex}
-  .modal{background:#fff;border-radius:20px;padding:26px 22px;max-width:400px;width:100%}
-  .modal h3{font-size:17px;font-weight:800;margin-bottom:4px}
-  .modal .sub{font-size:12.5px;color:#8b95a9;margin-bottom:18px}
-  .field{margin-bottom:14px}
-  .field label{display:block;font-size:12.5px;font-weight:700;color:#4a5670;margin-bottom:6px}
-  .field input{
-    width:100%;padding:11px 13px;border:1px solid #e7e2d6;border-radius:10px;font-size:14px;
-    outline:none;transition:.15s;
-  }
-  .field input:focus{border-color:#2F6BFF}
-  .modalBtns{display:flex;gap:8px;margin-top:18px}
-  .btn{flex:1;padding:12px;border-radius:100px;border:none;font-size:13.5px;font-weight:800;cursor:pointer}
-  .btnPrimary{background:#0B1834;color:#fff}
-  .btnPrimary:disabled{opacity:.5;cursor:not-allowed}
-  .btnGhost{background:#f3f1ea;color:#4a5670}
-  .errMsg{color:#D01C28;font-size:12px;margin-top:8px;display:none}
-
-  /* confirm screen */
-  #confirmScreen{display:none;text-align:center}
-  #confirmScreen .ic{
-    width:56px;height:56px;border-radius:50%;background:#FFF7E0;color:#B98A00;
-    display:grid;place-items:center;margin:0 auto 16px;font-size:26px;
-  }
-  #confirmScreen h2{font-size:21px;font-weight:800;margin-bottom:8px}
-  #confirmScreen .timer{font-size:14px;font-weight:800;color:#D01C28;margin-bottom:4px}
-  #confirmScreen .card{
-    background:#fff;border:1px solid #e7e2d6;border-radius:16px;padding:18px 20px;margin:20px 0;
-    text-align:left;font-size:13.5px;line-height:1.9;
-  }
-  #confirmScreen .card b{color:#0B1834}
-  #confirmScreen .note{font-size:12px;color:#9aa3b2;margin-top:14px}
-  #payBtn{
-    display:block;width:100%;padding:15px;border:none;border-radius:100px;background:#0B1834;color:#fff;
-    font-size:14.5px;font-weight:800;cursor:pointer;
+  .notice-bar {
+    background: #fff; border-radius: 14px; padding: 12px 16px; margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.06); font-size: 15.6px; font-weight: 700;
+    color: #888; text-align: center;
   }
 
-  #loading{text-align:center;padding:60px 0;color:#9aa3b2;font-size:13px}
+  .header {
+    background: linear-gradient(135deg, #0B1834 0%, #142954 100%);
+    border-radius: 20px; padding: 24px; color: #fff; margin-bottom: 20px;
+  }
+  .header .badge {
+    display: inline-block; background: #FFC844; color: #0B1834;
+    font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .header h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .header .countdown { font-size: 13px; color: rgba(255,255,255,0.7); }
+
+  .daily-warn {
+    background: #FFF8E1; border: 1px solid #FFE082; border-radius: 14px;
+    padding: 12px 16px; margin-bottom: 20px; font-size: 13.5px; color: #7A5C00;
+    line-height: 1.5; text-align: center;
+  }
+  .daily-warn b { color: #5C4400; }
+
+  .scramble-box {
+    background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08);
+  }
+  .scramble-box .label { font-size: 12px; font-weight: 700; color: #2F6BFF; margin-bottom: 8px; }
+  .scramble-box .text {
+    font-family: 'Courier New', monospace; font-size: 20px; font-weight: 700;
+    letter-spacing: 1px; line-height: 1.6; word-break: break-all;
+  }
+
+  .timer-box {
+    background: #0B1834; border-radius: 20px; padding: 40px 20px;
+    text-align: center; margin-bottom: 20px; user-select: none;
+    transition: background 0.15s ease;
+  }
+  .timer-box.inspecting { background: linear-gradient(165deg,#123a6e,#0B1834); }
+  .timer-box.inspecting.warn { background: linear-gradient(165deg,#5a3a12,#3a2410); }
+  .timer-box.inspecting.danger { background: linear-gradient(165deg,#5a1e1e,#3a1212); }
+  .timer-box.running { background: #159B4E; }
+  .timer-box.locked { background: #ccc; }
+  .timer-display { font-family: 'Courier New', monospace; font-size: 56px; font-weight: 800; color: #fff; }
+  .timer-box.ready .timer-display, .timer-box.locked .timer-display { color: #0B1834; }
+  .timer-hint { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 12px; }
+  .timer-box.ready .timer-hint, .timer-box.locked .timer-hint { color: rgba(11,24,52,0.6); }
+  /* ---- 전개도 (강제 표시) ---- */
+  .net-orient {
+    background: #EEF3FF; border: 1px solid #C9D9FF; border-radius: 10px;
+    padding: 10px 12px; font-size: 12.5px; color: #0B1834; margin-bottom: 14px; line-height: 1.5;
+  }
+  .net-wrap {
+    background: #fff; border-radius: 16px; padding: 14px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08); overflow-x: auto;
+  }
+  .net {
+    display: grid; grid-template-columns: repeat(4, max-content); grid-template-rows: repeat(3, max-content);
+    gap: 4px; grid-template-areas: ".  U  .  ." "L  F  R  B" ".  D  .  .";
+    justify-content: center; width: max-content; margin: 0 auto;
+  }
+  .net .face { display: grid; grid-template-columns: repeat(3, 14px); grid-template-rows: repeat(3, 14px); gap: 1px; }
+  .net .sticker { border-radius: 2px; border: 1px solid rgba(0,0,0,.15); }
+
+  @media (max-width: 420px) {
+    .net { gap: 3px; }
+    .net .face { grid-template-columns: repeat(3, 11px); grid-template-rows: repeat(3, 11px); }
+  }
+
+  /* ---- 회차별 확인(리뷰) 패널 ---- */
+  .round-review {
+    background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08); display: none; text-align: center;
+  }
+  .round-review.show { display: block; }
+  .round-review .rr-label { font-size: 13px; color: #888; margin-bottom: 4px; font-weight: 700; }
+  .round-review .rr-time { font-size: 32px; font-weight: 800; margin-bottom: 14px; }
+  .round-review .rr-penalties { display: flex; gap: 8px; margin-bottom: 16px; }
+  .round-review .rr-penalties button {
+    flex: 1; padding: 12px 0; border-radius: 10px; border: 1.5px solid #E5E7EB;
+    background: #fff; color: #666; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .round-review .rr-penalties button.on { background: #0B1834; color: #fff; border-color: #0B1834; }
+  .round-review .rr-next {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    background: #2F6BFF; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+
+  /* ---- 5회 기록 슬롯 ---- */
+  .slots {
+    display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px;
+    margin-bottom: 20px;
+  }
+  .slot {
+    background: #fff; border-radius: 12px; padding: 10px 6px; text-align: center;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.06); min-width: 0;
+  }
+  .slot.active { box-shadow: 0 0 0 2px #2F6BFF; }
+  .slot .n { font-size: 11px; color: #999; margin-bottom: 4px; }
+  .slot .t { font-family: 'Courier New', monospace; font-weight: 700; font-size: 14px; margin-bottom: 6px; word-break: break-all; }
+  .slot .t.empty { color: #ccc; }
+  .slot .t.dnf { color: #D01C28; }
+  .slot .penalties { display: flex; gap: 3px; justify-content: center; }
+  .slot .penalties button {
+    flex: 1; font-size: 10px; padding: 3px 0; border-radius: 6px; border: 1px solid #E5E7EB;
+    background: #fff; color: #999; cursor: pointer;
+  }
+  .slot .penalties button.on { background: #0B1834; color: #fff; border-color: #0B1834; }
+  .slot .penalties button:disabled { opacity: 0.3; cursor: default; }
+
+  /* ---- 결과 / 제출 박스 ---- */
+  .submit-box {
+    background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08); display: none;
+  }
+  .submit-box.show { display: block; }
+  .submit-box .result-time { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+  .submit-box .result-sub { font-size: 13px; color: #888; margin-bottom: 14px; }
+  .submit-box input {
+    width: 100%; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 10px;
+    font-size: 15px; margin-bottom: 10px;
+  }
+  .submit-box button.primary {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    background: #2F6BFF; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+  .submit-box button.primary:disabled { background: #ccc; cursor: not-allowed; }
+  .submit-box button.secondary {
+    width: 100%; padding: 12px; border: none; border-radius: 10px; margin-top: 8px;
+    background: #F0F1F3; color: #666; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .submit-msg { font-size: 13px; margin-top: 8px; color: #159B4E; }
+
+  .leaderboard {
+    background: #fff; border-radius: 16px; padding: 20px;
+    box-shadow: 0 4px 16px rgba(11,24,52,0.08);
+  }
+  .leaderboard h2 { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
+  .lb-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid #F0F1F3; font-size: 14px;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank {
+    width: 28px; height: 28px; border-radius: 50%; background: #F0F1F3;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; color: #666; flex-shrink: 0;
+  }
+  .lb-row.top1 .lb-rank { background: #FFC844; color: #0B1834; }
+  .lb-row.top2 .lb-rank { background: #D9DDE3; color: #0B1834; }
+  .lb-row.top3 .lb-rank { background: #E8C9A0; color: #0B1834; }
+  .lb-name { flex: 1; font-weight: 600; }
+  .lb-time { font-family: 'Courier New', monospace; font-weight: 700; color: #2F6BFF; }
+  .lb-empty { color: #999; font-size: 14px; text-align: center; padding: 20px 0; }
+
+  @media (max-width: 480px) {
+    .slot .t { font-size: 12px; }
+    .slot .penalties button { font-size: 9px; }
+  }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<div id="wrap">
+  <div class="notice-bar">5회 측정 후 최고/최저 기록을 제외한 평균(Ao5)으로 순위가 매겨져요.</div>
 
-  <div id="loading">불러오는 중...</div>
-
-  <div id="bookingScreen" style="display:none">
-    <div class="head">
-      <h2 id="courseName"></h2>
-      <p id="courseDesc"></p>
-    </div>
-    <div class="infoRow" id="infoRow"></div>
-
-    <!-- 날짜 기반(원데이 등) 강의용 화면 -->
-    <div id="dateBasedScreen">
-      <p class="sectionTitle">날짜 선택</p>
-      <div id="calHead">
-        <button id="calPrev" onclick="changeMonth(-1)">‹</button>
-        <div class="calTitle" id="calTitle"></div>
-        <button id="calNext" onclick="changeMonth(1)">›</button>
-      </div>
-      <div id="calWeekdays">
-        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
-      </div>
-      <div id="calGrid"></div>
-
-      <p class="sectionTitle">시간 선택</p>
-      <div id="timeGrid"></div>
-      <div id="emptyMsg" style="display:none">이 날짜엔 예약 가능한 시간이 없어요.</div>
-    </div>
-
-    <!-- 반(요일) 기반(정규반 등) 강의용 화면: 날짜가 아니라 반 자체에 정원이 걸림 -->
-    <div id="classBasedScreen" style="display:none">
-      <p class="sectionTitle">반 선택</p>
-      <div id="classGrid"></div>
-    </div>
+  <div class="header">
+    <div class="badge">위클리 콘테스트 · Ao5</div>
+    <h1 id="weekTitle">이번 주 종목</h1>
+    <div class="countdown" id="countdown">마감까지 계산 중...</div>
   </div>
 
-  <div id="confirmScreen">
-    <div class="ic">⏳</div>
-    <h2>시간이 임시로 확보됐어요!</h2>
-    <p class="timer" id="cfTimer"></p>
-    <div class="card">
-      <div><b id="cfName"></b></div>
-      <div id="cfDate"></div>
-      <div id="cfLocation"></div>
-    </div>
-    <button id="payBtn" onclick="goToPayment()">결제하러 가기</button>
-    <p class="note" id="cfContact"></p>
+  <div class="daily-warn">⏰ 하루에 딱 <b>한 번만</b> 기록을 등록할 수 있어요! <b>1회차를 시작하는 순간 그날의 시도가 확정</b>돼요 — 새로고침해도 다시 시작할 수 없으니, 마음의 준비가 됐을 때 시작해주세요 😊</div>
+
+  <div class="scramble-box">
+    <div class="label" id="scrambleLabel">1번째 스크램블</div>
+    <div class="text" id="scrambleText">불러오는 중...</div>
   </div>
 
-</div>
+  <div class="net-orient">🧭 그린(F)이 정면, 화이트(U)가 윗면을 향하도록 큐브를 든 상태에서 스크램블을 돌려야 아래 전개도와 일치해요. <b>스크램블을 다 돌린 후에는, 실제 큐브가 이 전개도와 똑같이 맞춰졌는지 꼭 확인해주세요!</b></div>
+  <div class="net-wrap">
+    <div class="net" id="netGrid"></div>
+  </div>
 
-<!-- 예약 정보 입력 모달 -->
-<div class="overlay" id="overlay">
-  <div class="modal">
-    <h3 id="modalTitle"></h3>
-    <p class="sub" id="modalSub"></p>
-    <div class="field">
-      <label>이름</label>
-      <input type="text" id="fName" placeholder="이름을 입력해주세요">
+  <div class="timer-box" id="timerBox">
+    <div class="timer-display" id="timerDisplay">0.00</div>
+    <div class="timer-hint" id="timerHint">스페이스바를 눌렀다 떼면 미리보기(15초) 시작 (모바일은 탭)</div>
+  </div>
+
+  <div class="round-review" id="roundReview">
+    <div class="rr-label" id="rrLabel">1회 기록</div>
+    <div class="rr-time" id="rrTime"></div>
+    <div class="rr-penalties" id="rrPenalties">
+      <button data-p="ok">OK</button>
+      <button data-p="plus2">+2</button>
+      <button data-p="dnf">DNF</button>
     </div>
-    <div class="field">
-      <label>연락처</label>
-      <input type="tel" id="fPhone" placeholder="010-0000-0000">
-    </div>
-    <div class="field">
-      <label>이메일 (선택)</label>
-      <input type="email" id="fEmail" placeholder="example@email.com">
-    </div>
-    <p class="errMsg" id="errMsg"></p>
-    <div class="modalBtns">
-      <button class="btn btnGhost" onclick="closeModal()">취소</button>
-      <button class="btn btnPrimary" id="submitBtn" onclick="submitBooking()">예약 확정</button>
-    </div>
+    <button class="rr-next" id="rrNextBtn">다음 스크램블로 →</button>
+  </div>
+
+  <div class="slots" id="slots"></div>
+
+  <div class="submit-box" id="submitBox">
+    <div class="result-time" id="resultTime"></div>
+    <div class="result-sub" id="resultSub"></div>
+    <input type="text" id="nicknameInput" placeholder="닉네임 (랭킹에 표시돼요)" maxlength="20">
+    <button class="primary" id="submitBtn">이 평균으로 제출하기</button>
+    <div class="submit-msg" id="submitMsg"></div>
+  </div>
+
+  <div class="leaderboard">
+    <h2>실시간 랭킹 (이번 주 최고 Ao5)</h2>
+    <div id="leaderboardList"><div class="lb-empty">불러오는 중...</div></div>
   </div>
 </div>
 
 <script>
-  // ====== 설정 ======
-  const DB_URL = 'https://allcube-booking-default-rtdb.firebaseio.com';
-  const COURSE_ID = 'oneday'; // 강의가 늘어나면 URL 쿼리 파라미터로 바꿔 받도록 확장 가능
+const DB_URL = 'https://allcube-booking-default-rtdb.firebaseio.com';
+const DEVICE_ID_KEY = 'allcube_contest_device_id';
+const NICKNAME_KEY = 'allcube_contest_nickname';
 
-  const DOW_KR = ['일','월','화','수','목','금','토'];
+let weekKey = null;
+let todayKey = null;
+let deviceId = null;
+let alreadySubmittedToday = false;
+let scrambles = [];
 
-  let courseData = null;
-  let selectedDate = null; // 'YYYY-MM-DD' (날짜기반) 또는 classKey (반기반)
-  let selectedTime = null;
-  let isRecurring = false; // 이 강의가 "반(요일) 기반" 정원 방식인지 여부
+let solves = [null, null, null, null, null];
+let currentIndex = 0;
 
-  function pad(n){ return n < 10 ? '0'+n : ''+n; }
-  function toDateStr(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+let state = 'idle';
+let startTime = null;
+let rafId = null;
+let finalTime = 0;
+let finalAvgSeconds = null;
 
-  async function init(){
-    const params = new URLSearchParams(location.search);
-    const courseId = params.get('course') || COURSE_ID;
-    window.__courseId = courseId;
+function fmt(ms) { return (ms / 1000).toFixed(2); }
+function todayDateKey() { return new Date().toLocaleDateString('en-CA'); }
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
 
-    const res = await fetch(`${DB_URL}/courses/${courseId}.json`);
-    courseData = await res.json();
-
-    if(!courseData){
-      document.getElementById('loading').textContent = '강의 정보를 찾을 수 없습니다.';
+async function loadContest() {
+  try {
+    const res = await fetch(`${DB_URL}/contests/current.json`);
+    const data = await res.json();
+    if (!data) {
+      document.getElementById('scrambleText').textContent = '아직 이번 주 콘테스트가 등록되지 않았어요.';
       return;
     }
-
-    document.getElementById('courseName').textContent = courseData.name;
-    document.getElementById('courseDesc').textContent =
-      (courseData.coachName ? courseData.coachName + ' 코치 · ' : '') + courseData.durationMin + '분 수업';
-
-    const info = document.getElementById('infoRow');
-    info.innerHTML = `
-      <span class="infoChip">⏱ ${courseData.durationMin}분</span>
-      <span class="infoChip">📍 ${courseData.location}</span>
-    `;
-
-    isRecurring = courseData.mode === 'recurring';
-
-    if(isRecurring){
-      document.getElementById('dateBasedScreen').style.display = 'none';
-      document.getElementById('classBasedScreen').style.display = 'block';
-      renderClassGrid();
-    } else {
-      document.getElementById('dateBasedScreen').style.display = 'block';
-      document.getElementById('classBasedScreen').style.display = 'none';
-      renderDateStrip();
-    }
-
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('bookingScreen').style.display = 'block';
+    weekKey = data.weekLabel;
+    todayKey = todayDateKey();
+    scrambles = [data.scramble1, data.scramble2, data.scramble3, data.scramble4, data.scramble5];
+    document.getElementById('weekTitle').textContent = `이번 주 종목: ${data.eventName || data.event}`;
+    startCountdown(data.endAt);
+    await checkTodaySubmission();
+    renderSlots();
+    updateScrambleDisplay();
+    loadLeaderboard();
+  } catch (e) {
+    document.getElementById('scrambleText').textContent = '콘테스트 정보를 불러오지 못했어요.';
   }
+}
 
-  let viewYear, viewMonth; // 캘린더에 표시 중인 연/월 (0-indexed month)
-  let minDate, maxDate; // 예약 가능한 최소/최대 날짜 (Date, 시각 00:00)
-
-  function renderDateStrip(){
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const activeDays = courseData.activeDays || 30;
-
-    minDate = new Date(today);
-    maxDate = new Date(today);
-    maxDate.setDate(today.getDate() + activeDays - 1);
-
-    viewYear = today.getFullYear();
-    viewMonth = today.getMonth();
-    selectedDate = toDateStr(today);
-
-    renderCalendar();
-    loadTimesForDate(selectedDate);
-  }
-
-  function changeMonth(delta){
-    let m = viewMonth + delta;
-    let y = viewYear;
-    if(m < 0){ m = 11; y--; }
-    if(m > 11){ m = 0; y++; }
-    viewYear = y; viewMonth = m;
-    renderCalendar();
-  }
-
-  function renderCalendar(){
-    document.getElementById('calTitle').textContent = `${viewYear}년 ${viewMonth+1}월`;
-
-    // 이전/다음 버튼 활성/비활성 처리 (조회 가능 범위 밖으로는 못 나가게)
-    const isMinMonth = (viewYear === minDate.getFullYear() && viewMonth === minDate.getMonth());
-    const isMaxMonth = (viewYear === maxDate.getFullYear() && viewMonth === maxDate.getMonth());
-    document.getElementById('calPrev').disabled = isMinMonth;
-    document.getElementById('calNext').disabled = isMaxMonth;
-
-    const grid = document.getElementById('calGrid');
-    grid.innerHTML = '';
-
-    const firstDay = new Date(viewYear, viewMonth, 1);
-    const startWeekday = firstDay.getDay();
-    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-    const todayStr = toDateStr(new Date());
-
-    for(let i = 0; i < startWeekday; i++){
-      const empty = document.createElement('div');
-      empty.className = 'calCell empty';
-      grid.appendChild(empty);
-    }
-
-    for(let day = 1; day <= daysInMonth; day++){
-      const cellDate = new Date(viewYear, viewMonth, day);
-      cellDate.setHours(0,0,0,0);
-      const dateStr = toDateStr(cellDate);
-      const dow = cellDate.getDay();
-      const hasSchedule = ((courseData.schedule && courseData.schedule[dow]) || []).length > 0;
-      const inRange = cellDate >= minDate && cellDate <= maxDate;
-      const disabled = !inRange || !hasSchedule;
-
-      const cell = document.createElement('div');
-      cell.className = 'calCell' + (disabled ? ' disabled' : '') + (dateStr === todayStr ? ' today' : '') + (dateStr === selectedDate ? ' on' : '');
-      cell.textContent = day;
-      if(!disabled){
-        cell.onclick = () => selectDate(dateStr, cell);
-      }
-      grid.appendChild(cell);
-    }
-  }
-
-  function selectDate(dateStr, cellEl){
-    selectedDate = dateStr;
-    document.querySelectorAll('.calCell').forEach(c => c.classList.remove('on'));
-    cellEl.classList.add('on');
-    loadTimesForDate(dateStr);
-  }
-
-  // ====== 정원 판단 로직 (날짜기반/반기반 공통 재사용) ======
-  // "status가 정확히 confirmed일 때만 영구 유효", 그 외는 홀드시간(bookedAt+holdMinutes) 기준으로 판단.
-  function isActiveEntry(entry, holdMinutes){
-    if(!entry) return false;
-    if(entry.status === 'confirmed') return true; // 결제 확정된 예약만 영구 유효
-
-    const bookedMs = new Date(entry.bookedAt).getTime();
-    if(isNaN(bookedMs)) return false; // bookedAt이 없거나 잘못된 값이면 자리 차지하지 않음 (안전한 기본값)
-    return (Date.now() - bookedMs) < holdMinutes * 60000;
-  }
-
-  async function loadTimesForDate(dateStr){
-    const grid = document.getElementById('timeGrid');
-    const emptyMsg = document.getElementById('emptyMsg');
-    grid.innerHTML = '';
-
-    const d = new Date(dateStr + 'T00:00:00');
-    const dow = d.getDay();
-    const times = (courseData.schedule && courseData.schedule[dow]) || [];
-
-    if(times.length === 0){
-      emptyMsg.style.display = 'block';
+async function checkTodaySubmission() {
+  try {
+    const entryRes = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}/${deviceId}/${todayKey}.json`);
+    const entryData = await entryRes.json();
+    if (entryData) {
+      alreadySubmittedToday = true;
+      if (entryData.dnf) lockTimerDnf(); else lockTimer(entryData.time);
       return;
     }
-    emptyMsg.style.display = 'none';
+  } catch (e) { /* ignore */ }
+  try {
+    const attemptRes = await fetch(`${DB_URL}/contestAttempts/${encodeURIComponent(weekKey)}/${deviceId}/${todayKey}.json`);
+    const attemptData = await attemptRes.json();
+    if (attemptData) {
+      alreadySubmittedToday = true;
+      lockTimerAbandoned();
+    }
+  } catch (e) { /* ignore */ }
+}
 
-    // 해당 날짜의 예약 현황 조회
-    const res = await fetch(`${DB_URL}/bookings/${window.__courseId}/${dateStr}.json`);
-    const bookingsForDate = (await res.json()) || {};
-
-    const capacity = courseData.capacity || 1;
-    const holdMinutes = courseData.holdMinutes || 15;
-
-    times.forEach(t => {
-      const entries = bookingsForDate[t] ? Object.values(bookingsForDate[t]) : [];
-      const activeCount = entries.filter(e => isActiveEntry(e, holdMinutes)).length;
-      const remaining = capacity - activeCount;
-      const full = remaining <= 0;
-
-      const btn = document.createElement('div');
-      btn.className = 'timeBtn' + (full ? ' full' : '');
-      btn.innerHTML = `<div class="t">${t}</div><div class="left">${full ? '마감' : remaining + '석 남음'}</div>`;
-      if(!full){
-        btn.onclick = () => openModal(t);
-      }
-      grid.appendChild(btn);
+async function claimDailyAttempt() {
+  try {
+    const res = await fetch(`${DB_URL}/contestAttempts/${encodeURIComponent(weekKey)}/${deviceId}/${todayKey}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startedAt: new Date().toISOString() })
     });
+    return res.ok;
+  } catch (e) {
+    return false;
   }
+}
 
-  // ====== 반(요일) 기반 강의 전용 로직 ======
-  // 날짜별이 아니라 "월요일반/수요일반/금요일반" 같은 반 자체에 정원이 걸리는 방식.
-  // Firebase 경로는 기존과 동일하게 /bookings/{courseId}/{classKey}/{time}/{id} 를 그대로 사용해서
-  // admin.html / 결제확인 Worker와 100% 호환됨 (classKey를 "날짜" 자리에 그대로 끼워넣는 것뿐).
-  // 특정 날짜가 아니라 classKey 자체가 고정된 주소이기 때문에, 몇 주가 지나도 같은 경로를 계속
-  // 누적 집계하게 되어 "그 반이 찰 때까지 계속 마감 유지"가 자동으로 성립함.
-  async function renderClassGrid(){
-    const grid = document.getElementById('classGrid');
-    grid.innerHTML = '';
+function lockTimer(time) {
+  const box = document.getElementById('timerBox');
+  box.classList.add('locked');
+  document.getElementById('timerDisplay').textContent = time.toFixed(2);
+  document.getElementById('timerHint').textContent = '오늘은 이미 참여했어요. 내일 다시 도전해보세요!';
+}
 
-    const classes = courseData.classes || {};
-    const capacity = courseData.capacity || 1;
-    const holdMinutes = courseData.holdMinutes || 15;
-    const classKeys = Object.keys(classes);
+function lockTimerDnf() {
+  const box = document.getElementById('timerBox');
+  box.classList.add('locked');
+  document.getElementById('timerDisplay').textContent = 'DNF';
+  document.getElementById('timerHint').textContent = '오늘 시도는 DNF로 마감됐어요. 내일 다시 도전해보세요!';
+}
 
-    if(classKeys.length === 0){
-      grid.innerHTML = '<div id="emptyMsg" style="display:block">아직 개설된 반이 없어요.</div>';
+function lockTimerAbandoned() {
+  const box = document.getElementById('timerBox');
+  box.classList.add('locked');
+  document.getElementById('timerDisplay').textContent = '-';
+  document.getElementById('timerHint').textContent = '오늘 이미 콘테스트를 시작했지만 끝까지 마치지 못했어요. 새로고침으로는 다시 시작할 수 없어요 — 내일 다시 도전해주세요!';
+}
+
+function startCountdown(endAt) {
+  const end = new Date(endAt).getTime();
+  const el = document.getElementById('countdown');
+  function tick() {
+    const diff = end - Date.now();
+    if (diff <= 0) { el.textContent = '이번 주 콘테스트가 마감되었어요'; return; }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    el.textContent = `마감까지 ${d}일 ${h}시간 ${m}분 남음`;
+  }
+  tick();
+  setInterval(tick, 60000);
+}
+
+async function loadLeaderboard() {
+  if (!weekKey) return;
+  try {
+    const res = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}.json`);
+    const data = await res.json();
+    const listEl = document.getElementById('leaderboardList');
+    if (!data) {
+      listEl.innerHTML = '<div class="lb-empty">아직 제출된 기록이 없어요. 첫 기록의 주인공이 되어보세요!</div>';
       return;
     }
+    const bestByUser = Object.entries(data).map(([id, days]) => {
+      const validEntries = Object.values(days).filter(e => !e.dnf && typeof e.time === 'number');
+      if (validEntries.length === 0) return null;
+      return validEntries.reduce((a, b) => (a.time < b.time ? a : b));
+    }).filter(e => e !== null).sort((a, b) => a.time - b.time);
 
-    for(const classKey of classKeys){
-      const cls = classes[classKey];
-      const res = await fetch(`${DB_URL}/bookings/${window.__courseId}/${classKey}/${cls.time}.json`);
-      const entries = res.ok ? Object.values((await res.json()) || {}) : [];
-      const activeCount = entries.filter(e => isActiveEntry(e, holdMinutes)).length;
-      const remaining = capacity - activeCount;
-      const full = remaining <= 0;
+    listEl.innerHTML = bestByUser.map((e, i) => {
+      const rankClass = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+      return `<div class="lb-row ${rankClass}">
+        <div class="lb-rank">${i + 1}</div>
+        <div class="lb-name">${escapeHtml(e.nickname)}</div>
+        <div class="lb-time">${e.time.toFixed(2)}초</div>
+      </div>`;
+    }).join('');
+  } catch (e) { /* 다음 폴링에서 재시도 */ }
+}
 
-      const btn = document.createElement('div');
-      btn.className = 'classBtn' + (full ? ' full' : '');
-      btn.innerHTML = `
-        <div>
-          <div class="label">${cls.label}</div>
-          <div class="time">${cls.time}</div>
-        </div>
-        <div class="left">${full ? '마감' : remaining + '석 남음'}</div>
-      `;
-      if(!full){
-        btn.onclick = () => openModal(cls.time, classKey, cls.label);
+function updateScrambleDisplay() {
+  if (currentIndex >= 5) return;
+  document.getElementById('scrambleLabel').textContent = `${currentIndex + 1}번째 스크램블`;
+  document.getElementById('scrambleText').textContent = scrambles[currentIndex] || '스크램블 없음';
+  renderNetView();
+}
+
+// ---------- 전개도(3D 좌표 기반) — 큐브타이머와 동일 엔진, 3x3x3 고정 ----------
+const NET_COLORS = { U: '#ffffff', D: '#ffe600', F: '#00e676', B: '#2979ff', L: '#ff6d00', R: '#ff1a1a' };
+const NC_FACE_TABLE = {
+  R: { axis: 'x', sign: -1 }, L: { axis: 'x', sign: 1 },
+  U: { axis: 'y', sign: -1 }, D: { axis: 'y', sign: 1 },
+  F: { axis: 'z', sign: -1 }, B: { axis: 'z', sign: 1 }
+};
+function ncRotateVec(v, axis, steps) {
+  const n = ((steps % 4) + 4) % 4;
+  let x = v.x, y = v.y, z = v.z;
+  for (let i = 0; i < n; i++) {
+    if (axis === 'x') { const ny = -z, nz = y; y = ny; z = nz; }
+    else if (axis === 'y') { const nx = z, nz2 = -x; x = nx; z = nz2; }
+    else { const nx2 = -y, ny2 = x; x = nx2; y = ny2; }
+  }
+  return { x, y, z };
+}
+function ncBuildCubies(n) {
+  const half = (n - 1) / 2;
+  const coords = []; for (let i = 0; i < n; i++) coords.push(i - half);
+  const FACE_DEFS = [
+    { face: 'R', axis: 'x', value: half }, { face: 'L', axis: 'x', value: -half },
+    { face: 'U', axis: 'y', value: half }, { face: 'D', axis: 'y', value: -half },
+    { face: 'F', axis: 'z', value: half }, { face: 'B', axis: 'z', value: -half }
+  ];
+  const cubies = [];
+  coords.forEach((x) => { coords.forEach((y) => { coords.forEach((z) => {
+    if (Math.abs(x) !== half && Math.abs(y) !== half && Math.abs(z) !== half) return;
+    const stickers = [];
+    FACE_DEFS.forEach((def) => {
+      const coord = { x, y, z }[def.axis];
+      if (coord === def.value) {
+        const normal = { x: 0, y: 0, z: 0 }; normal[def.axis] = def.value / half;
+        stickers.push({ normal, color: def.face });
       }
-      grid.appendChild(btn);
+    });
+    cubies.push({ pos: { x, y, z }, stickers });
+  }); }); });
+  return cubies;
+}
+function ncApplyToken(cubies, token, n) {
+  const half = (n - 1) / 2;
+  const m = /^([UDLRFB])(w)?(2|')?$/.exec(token.trim());
+  if (!m) return false;
+  const face = m[1], wide = !!m[2], mod = m[3];
+  const quarterTurns = mod === "'" ? -1 : mod === '2' ? 2 : 1;
+  const def = NC_FACE_TABLE[face];
+  const gridSteps = def.sign * quarterTurns;
+  const extreme = (face === 'R' || face === 'U' || face === 'F') ? half : -half;
+  const dirIn = (face === 'R' || face === 'U' || face === 'F') ? -1 : 1;
+  const depths = wide ? [0, 1] : [0];
+  const targetCoords = depths.map((k) => extreme + dirIn * k);
+  cubies.forEach((c) => {
+    if (targetCoords.indexOf(c.pos[def.axis]) > -1) {
+      c.pos = ncRotateVec(c.pos, def.axis, gridSteps);
+      c.stickers.forEach((s) => { s.normal = ncRotateVec(s.normal, def.axis, gridSteps); });
     }
+  });
+  return true;
+}
+function ncApplyScramble(scramble, n) {
+  const cubies = ncBuildCubies(n);
+  const tokens = (scramble || '').trim().split(/\s+/).filter(Boolean);
+  for (let i = 0; i < tokens.length; i++) { if (!ncApplyToken(cubies, tokens[i], n)) return null; }
+  return cubies;
+}
+const NC_FACE_READ = {
+  F: { axis: 'z', sign: 1, row: (iy) => (2 - iy), col: (ix) => ix },
+  U: { axis: 'y', sign: 1, row: (iz) => iz, col: (ix) => ix },
+  D: { axis: 'y', sign: -1, row: (iz) => (2 - iz), col: (ix) => ix },
+  L: { axis: 'x', sign: -1, row: (iy) => (2 - iy), col: (iz) => iz },
+  R: { axis: 'x', sign: 1, row: (iy) => (2 - iy), col: (iz) => (2 - iz) },
+  B: { axis: 'z', sign: -1, row: (iy) => (2 - iy), col: (ix) => (2 - ix) }
+};
+function ncReadFaceGrid(cubies, faceName, n) {
+  const half = (n - 1) / 2;
+  const spec = NC_FACE_READ[faceName];
+  const target = spec.sign === 1 ? half : -half;
+  const grid = []; for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(0); grid.push(row); }
+  cubies.forEach((c) => {
+    if (c.pos[spec.axis] !== target) return;
+    const ix = c.pos.x + half, iy = c.pos.y + half, iz = c.pos.z + half;
+    let row, col;
+    if (faceName === 'U' || faceName === 'D') { row = spec.row(iz); col = spec.col(ix); }
+    else { row = spec.row(iy); col = spec.col(faceName === 'F' || faceName === 'B' ? ix : iz); }
+    const sticker = c.stickers.find((s) => {
+      const mag = Math.abs(s.normal.x) + Math.abs(s.normal.y) + Math.abs(s.normal.z);
+      return mag === 1 && s.normal[spec.axis] !== 0 && Math.sign(s.normal[spec.axis]) === spec.sign;
+    });
+    if (sticker) grid[row][col] = sticker.color;
+  });
+  return grid;
+}
+function netBuildFaceEl(faceGrid, areaName, n) {
+  const wrap = document.createElement('div');
+  wrap.className = 'face'; wrap.style.gridArea = areaName;
+  for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+    const d = document.createElement('div');
+    d.className = 'sticker'; d.style.background = NET_COLORS[faceGrid[r][col]];
+    wrap.appendChild(d);
   }
+  return wrap;
+}
+function renderNetView() {
+  const gridEl = document.getElementById('netGrid');
+  const scramble = scrambles[currentIndex];
+  const cubies = ncApplyScramble(scramble, 3);
+  if (!cubies) { gridEl.innerHTML = ''; return; }
+  gridEl.innerHTML = '';
+  ['U', 'L', 'F', 'R', 'B', 'D'].forEach((f) => {
+    gridEl.appendChild(netBuildFaceEl(ncReadFaceGrid(cubies, f, 3), f, 3));
+  });
+}
 
-  function openModal(time, classKey, classLabel){
-    selectedTime = time;
-    if(isRecurring){
-      selectedDate = classKey; // classKey를 그대로 "날짜 자리"에 사용 (Firebase 경로 재사용)
-      document.getElementById('modalTitle').textContent = '등록 정보 입력';
-      document.getElementById('modalSub').textContent = `${classLabel} · ${time}`;
-    } else {
-      document.getElementById('modalTitle').textContent = '예약 정보 입력';
-      document.getElementById('modalSub').textContent =
-        `${selectedDate} (${DOW_KR[new Date(selectedDate+'T00:00:00').getDay()]}) ${time}`;
+function renderSlots() {
+  const wrap = document.getElementById('slots');
+  wrap.innerHTML = solves.map((s, i) => {
+    const active = i === currentIndex && !alreadySubmittedToday ? 'active' : '';
+    let timeText = '<span class="t empty">--.--</span>';
+    let penaltiesHtml = `
+      <div class="penalties">
+        <button disabled>OK</button><button disabled>+2</button><button disabled>DNF</button>
+      </div>`;
+    if (s) {
+      const eff = effectiveSeconds(s);
+      if (s.penalty === 'dnf') {
+        timeText = `<span class="t dnf">DNF</span>`;
+      } else {
+        timeText = `<span class="t">${eff.toFixed(2)}</span>`;
+      }
+      penaltiesHtml = `
+        <div class="penalties">
+          <button class="${s.penalty === 'ok' ? 'on' : ''}" onclick="setPenalty(${i},'ok')">OK</button>
+          <button class="${s.penalty === 'plus2' ? 'on' : ''}" onclick="setPenalty(${i},'plus2')">+2</button>
+          <button class="${s.penalty === 'dnf' ? 'on' : ''}" onclick="setPenalty(${i},'dnf')">DNF</button>
+        </div>`;
     }
-    document.getElementById('fName').value = '';
-    document.getElementById('fPhone').value = '';
-    document.getElementById('fEmail').value = '';
-    document.getElementById('errMsg').style.display = 'none';
-    document.getElementById('overlay').classList.add('on');
-  }
+    return `<div class="slot ${active}">
+      <div class="n">${i + 1}회</div>
+      ${timeText}
+      ${penaltiesHtml}
+    </div>`;
+  }).join('');
+}
 
-  function closeModal(){
-    document.getElementById('overlay').classList.remove('on');
-  }
+function effectiveSeconds(s) {
+  if (s.penalty === 'dnf') return Infinity;
+  const base = s.rawMs / 1000;
+  return s.penalty === 'plus2' ? base + 2 : base;
+}
 
-  let currentBookingId = null; // 방금 생성한 예약의 Firebase push ID (결제 연동에 사용)
-  let currentClassLabel = null; // 반기반 강의일 때 확정화면에 보여줄 반 이름
+window.setPenalty = function(i, penalty) {
+  if (alreadySubmittedToday) return;
+  if (!solves[i]) return;
+  solves[i].penalty = penalty;
+  renderSlots();
+  if (solves.every(s => s)) computeAndShowAverage();
+};
 
-  async function submitBooking(){
-    const name = document.getElementById('fName').value.trim();
-    const phone = document.getElementById('fPhone').value.trim();
-    const email = document.getElementById('fEmail').value.trim();
-    const errEl = document.getElementById('errMsg');
-    const submitBtn = document.getElementById('submitBtn');
+const timerBox = document.getElementById('timerBox');
+const timerDisplay = document.getElementById('timerDisplay');
+const timerHint = document.getElementById('timerHint');
+const submitBox = document.getElementById('submitBox');
+const resultTime = document.getElementById('resultTime');
+const resultSub = document.getElementById('resultSub');
+const nicknameInput = document.getElementById('nicknameInput');
+const submitBtn = document.getElementById('submitBtn');
+const submitMsg = document.getElementById('submitMsg');
 
-    if(!name || !phone){
-      errEl.textContent = '이름과 연락처는 필수입니다.';
-      errEl.style.display = 'block';
-      return;
-    }
+nicknameInput.value = localStorage.getItem(NICKNAME_KEY) || '';
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = '처리 중...';
+// ---------- 인스펙션(15초 미리보기) 포함 타이머 ----------
+const INSPECTION_MS = 15000;
+let inspectionStart = 0;
+let pendingPenaltyFromInspection = null; // 'ok' | 'plus2' | 'dnf'
+let announced8 = false;
+let announced12 = false;
 
-    try {
-      const holdMinutes = courseData.holdMinutes || 15;
+function isTouchDevice() {
+  return window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+}
 
-      // 제출 직전 재확인 (동시 예약 방지용 최소 보정)
-      const checkRes = await fetch(`${DB_URL}/bookings/${window.__courseId}/${selectedDate}/${selectedTime}.json`);
-      const current = (await checkRes.json()) || {};
-      const currentActiveCount = Object.values(current).filter(e => isActiveEntry(e, holdMinutes)).length;
-      const capacity = courseData.capacity || 1;
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = 1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
 
-      if(currentActiveCount >= capacity){
-        errEl.textContent = '방금 마감되었습니다. 다른 시간을 선택해주세요.';
-        errEl.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.textContent = '예약 확정';
-        closeModal();
-        if(isRecurring){ renderClassGrid(); } else { loadTimesForDate(selectedDate); }
+let isClaiming = false;
+
+async function handleTap() {
+  if (alreadySubmittedToday) return;
+  if (currentIndex >= 5) return;
+  if (state === 'reviewing') return; // 리뷰 중엔 "다음으로" 버튼으로만 진행
+  if (isClaiming) return;
+  if (state === 'idle') {
+    if (currentIndex === 0) {
+      isClaiming = true;
+      timerHint.textContent = '확인 중...';
+      const claimed = await claimDailyAttempt();
+      isClaiming = false;
+      if (!claimed) {
+        alreadySubmittedToday = true;
+        lockTimerAbandoned();
         return;
       }
+    }
+    startInspection();
+  } else if (state === 'inspecting') {
+    startSolve();
+  } else if (state === 'running') {
+    stopSolve();
+  }
+}
 
-      const body = {
-        name, phone,
-        ...(email ? { email } : {}),
-        status: 'pending',
-        bookedAt: new Date().toISOString()
-      };
+function startInspection() {
+  state = 'inspecting';
+  inspectionStart = performance.now();
+  pendingPenaltyFromInspection = 'ok';
+  announced8 = false;
+  announced12 = false;
+  timerBox.className = 'timer-box inspecting';
+  timerHint.textContent = isTouchDevice() ? '화면을 다시 눌렀다 떼면 시작' : '스페이스바를 다시 눌렀다 떼면 시작';
+  tickInspection();
+}
 
-      const postRes = await fetch(`${DB_URL}/bookings/${window.__courseId}/${selectedDate}/${selectedTime}.json`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+function tickInspection() {
+  if (state !== 'inspecting') return;
+  const elapsed = performance.now() - inspectionStart;
+  const remain = INSPECTION_MS - elapsed;
+  const remainSec = Math.ceil(remain / 1000);
 
-      if(!postRes.ok) throw new Error('failed');
+  if (!announced8 && elapsed >= 8000) { announced8 = true; speak('8초'); }
+  if (!announced12 && elapsed >= 12000) { announced12 = true; speak('12초'); }
 
-      const postResult = await postRes.json();
-      currentBookingId = postResult.name; // Firebase가 생성한 push ID
+  if (remain <= -2000) {
+    pendingPenaltyFromInspection = 'dnf';
+    timerDisplay.textContent = 'DNF';
+    timerBox.className = 'timer-box inspecting danger';
+  } else if (remain <= 0) {
+    pendingPenaltyFromInspection = 'plus2';
+    timerDisplay.textContent = '+2';
+    timerBox.className = 'timer-box inspecting warn';
+  } else {
+    pendingPenaltyFromInspection = 'ok';
+    timerDisplay.textContent = String(remainSec);
+    timerBox.className = 'timer-box inspecting' + (remainSec <= 3 ? ' warn' : '');
+  }
+  rafId = requestAnimationFrame(tickInspection);
+}
 
-      if(isRecurring){
-        currentClassLabel = (courseData.classes && courseData.classes[selectedDate] && courseData.classes[selectedDate].label) || selectedDate;
-      }
+function startSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  state = 'running';
+  timerBox.className = 'timer-box running';
+  timerHint.textContent = isTouchDevice() ? '화면을 다시 누르면 정지' : '스페이스바를 다시 누르면 정지';
+  startTime = performance.now();
+  tickTimer();
+}
 
-      showHold(name, holdMinutes);
-    } catch(e){
-      errEl.textContent = '예약 처리 중 오류가 발생했습니다. 다시 시도해주세요.';
-      errEl.style.display = 'block';
+function stopSolve() {
+  if (rafId) cancelAnimationFrame(rafId);
+  finalTime = performance.now() - startTime;
+  state = 'reviewing';
+  timerBox.className = 'timer-box locked';
+
+  const penalty = pendingPenaltyFromInspection || 'ok';
+  solves[currentIndex] = { rawMs: finalTime, penalty };
+  renderSlots();
+
+  pendingPenaltyFromInspection = null;
+  showRoundReview();
+}
+
+function showRoundReview() {
+  const s = solves[currentIndex];
+  document.getElementById('rrLabel').textContent = `${currentIndex + 1}회 기록`;
+  renderRoundReviewTime();
+  timerDisplay.textContent = '0.00';
+  timerHint.textContent = '아래에서 결과를 확인하고 다음으로 넘어가세요';
+  document.getElementById('roundReview').classList.add('show');
+}
+
+function renderRoundReviewTime() {
+  const s = solves[currentIndex];
+  const eff = effectiveSeconds(s);
+  document.getElementById('rrTime').textContent = s.penalty === 'dnf' ? 'DNF' : eff.toFixed(2) + '초';
+  document.querySelectorAll('#rrPenalties button').forEach((btn) => {
+    btn.classList.toggle('on', btn.getAttribute('data-p') === s.penalty);
+  });
+}
+
+document.querySelectorAll('#rrPenalties button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    solves[currentIndex].penalty = btn.getAttribute('data-p');
+    renderRoundReviewTime();
+    renderSlots();
+  });
+});
+
+document.getElementById('rrNextBtn').addEventListener('click', () => {
+  document.getElementById('roundReview').classList.remove('show');
+  currentIndex++;
+  state = 'idle';
+  timerBox.className = 'timer-box';
+  if (currentIndex < 5) {
+    updateScrambleDisplay();
+    timerHint.textContent = isTouchDevice() ? '화면을 눌렀다 떼면 다음 미리보기 시작' : '스페이스바를 눌렀다 떼면 다음 미리보기 시작';
+  } else {
+    document.getElementById('scrambleLabel').textContent = '완료';
+    document.getElementById('scrambleText').textContent = '5회 측정이 모두 끝났어요.';
+    computeAndShowAverage();
+  }
+});
+
+function tickTimer() {
+  timerDisplay.textContent = fmt(performance.now() - startTime);
+  rafId = requestAnimationFrame(tickTimer);
+}
+
+document.addEventListener('keydown', (e) => { if (e.code === 'Space') e.preventDefault(); });
+document.addEventListener('keyup', (e) => { if (e.code === 'Space') { e.preventDefault(); handleTap(); } });
+timerBox.addEventListener('touchstart', (e) => { e.preventDefault(); });
+timerBox.addEventListener('touchend', (e) => { e.preventDefault(); handleTap(); });
+
+function computeAndShowAverage() {
+  if (!solves.every(s => s)) return;
+  const effs = solves.map(effectiveSeconds);
+  const dnfCount = effs.filter(v => v === Infinity).length;
+
+  if (dnfCount >= 2) {
+    submitBox.classList.add('show');
+    resultTime.textContent = 'DNF';
+    resultSub.textContent = 'DNF(실패)가 2개 이상이라 이번 주 이 Ao5 시도는 DNF로 확정돼요. 오늘은 여기까지예요.';
+    submitBtn.textContent = 'DNF로 오늘 기록 제출하기';
+    submitBtn.disabled = false;
+    finalAvgSeconds = 'DNF';
+    return;
+  }
+
+  const sorted = [...effs].sort((a, b) => a - b);
+  const middle = sorted.slice(1, 4);
+  const avg = middle.reduce((a, b) => a + b, 0) / middle.length;
+
+  finalAvgSeconds = avg;
+  submitBox.classList.add('show');
+  resultTime.textContent = `Ao5: ${avg.toFixed(2)}초`;
+  resultSub.textContent = `기록: ${effs.map(v => v === Infinity ? 'DNF' : v.toFixed(2)).join(' / ')} (최고·최저 제외 평균)`;
+  submitBtn.textContent = '이 평균으로 제출하기';
+  submitBtn.disabled = false;
+  submitMsg.textContent = '';
+}
+
+submitBtn.addEventListener('click', async () => {
+  const nickname = nicknameInput.value.trim();
+  if (!nickname) { submitMsg.style.color = '#D01C28'; submitMsg.textContent = '닉네임을 입력해주세요.'; return; }
+  if (!weekKey || finalAvgSeconds === null) return;
+
+  const isDnf = finalAvgSeconds === 'DNF';
+  localStorage.setItem(NICKNAME_KEY, nickname);
+  submitBtn.disabled = true;
+  submitMsg.style.color = '#159B4E';
+  submitMsg.textContent = '제출 중...';
+
+  const body = isDnf
+    ? { nickname, dnf: true, submittedAt: new Date().toISOString() }
+    : { nickname, time: finalAvgSeconds, submittedAt: new Date().toISOString() };
+
+  try {
+    const res = await fetch(`${DB_URL}/contestEntries/${encodeURIComponent(weekKey)}/${deviceId}/${todayKey}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      submitMsg.style.color = '#D01C28';
+      submitMsg.textContent = '오늘은 이미 제출했거나 오류가 발생했어요.';
       submitBtn.disabled = false;
-      submitBtn.textContent = '예약 확정';
+      return;
     }
+    alreadySubmittedToday = true;
+    if (isDnf) lockTimerDnf(); else lockTimer(finalAvgSeconds);
+    submitMsg.textContent = isDnf ? '오늘 시도가 DNF로 기록됐어요. 내일 다시 도전해보세요.' : 'Ao5 기록이 등록됐어요! 내일 또 도전해보세요.';
+    renderSlots();
+    loadLeaderboard();
+  } catch (e) {
+    submitMsg.style.color = '#D01C28';
+    submitMsg.textContent = '제출에 실패했어요. 다시 시도해주세요.';
+    submitBtn.disabled = false;
   }
+});
 
-  let holdTimerInterval = null;
-
-  function showHold(name, holdMinutes){
-    closeModal();
-    document.getElementById('bookingScreen').style.display = 'none';
-    document.getElementById('confirmScreen').style.display = 'block';
-
-    document.getElementById('cfName').textContent = courseData.name;
-    if(isRecurring){
-      document.getElementById('cfDate').textContent = `${currentClassLabel} · ${selectedTime} (매주 반복)`;
-    } else {
-      const dow = DOW_KR[new Date(selectedDate+'T00:00:00').getDay()];
-      document.getElementById('cfDate').textContent = `${selectedDate} (${dow}) ${selectedTime}`;
-    }
-    document.getElementById('cfLocation').textContent = `📍 ${courseData.location}`;
-    document.getElementById('cfContact').textContent =
-      `다른 분들도 이 시간을 기다리고 있어요. ${holdMinutes}분 안에 결제를 완료하지 않으면 예약이 자동 취소되고 다시 열립니다. 문의: ${courseData.contactPhone}`;
-
-    const deadline = Date.now() + holdMinutes * 60000;
-    const timerEl = document.getElementById('cfTimer');
-
-    function tick(){
-      const leftMs = deadline - Date.now();
-      if(leftMs <= 0){
-        timerEl.textContent = '예약 시간이 만료되어 다른 분에게 열렸습니다. 다시 선택해주세요.';
-        document.getElementById('payBtn').disabled = true;
-        clearInterval(holdTimerInterval);
-        return;
-      }
-      const m = Math.floor(leftMs / 60000);
-      const s = Math.floor((leftMs % 60000) / 1000);
-      timerEl.textContent = `⏱ 남은 시간 ${m}:${s < 10 ? '0'+s : s}`;
-    }
-    tick();
-    if(holdTimerInterval) clearInterval(holdTimerInterval);
-    holdTimerInterval = setInterval(tick, 1000);
-  }
-
-  function goToPayment(){
-    if(courseData.paymentUrl){
-      // 예약 식별자를 결제 URL에 함께 실어보냄 (추후 자동 결제확인 연동 시 사용)
-      const sep = courseData.paymentUrl.includes('?') ? '&' : '?';
-      const url = `${courseData.paymentUrl}${sep}bcid=${encodeURIComponent(window.__courseId)}`
-        + `&bdate=${encodeURIComponent(selectedDate)}`
-        + `&btime=${encodeURIComponent(selectedTime)}`
-        + `&bid=${encodeURIComponent(currentBookingId || '')}`;
-      location.href = url;
-    } else {
-      alert('결제 페이지 연결이 아직 설정되지 않았습니다. ' + courseData.contactPhone + '로 문의해주세요.');
-    }
-  }
-
-  init();
+deviceId = getOrCreateDeviceId();
+loadContest();
+setInterval(loadLeaderboard, 15000);
 </script>
-
 </body>
 </html>
