@@ -155,12 +155,21 @@
         <label>&nbsp;</label>
         <button id="csvBtn" onclick="downloadCSV()">CSV 다운로드</button>
       </div>
+      <div class="field">
+        <label>결제 확인 필터</label>
+        <select id="paidFilter">
+          <option value="all">전체 보기</option>
+          <option value="unpaid">결제 미확인만</option>
+          <option value="paid">결제 확인됨만</option>
+        </select>
+      </div>
     </div>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
+            <th>결제확인</th>
             <th>날짜</th>
             <th>시간</th>
             <th>이름</th>
@@ -171,7 +180,7 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="7" class="loading">불러오는 중...</td></tr>
+          <tr><td colspan="8" class="loading">불러오는 중...</td></tr>
         </tbody>
       </table>
     </div>
@@ -179,7 +188,8 @@
     <footer class="note">
       ⚠️ 이 페이지는 간단한 화면 잠금만 적용되어 있어요. Firebase 보안 규칙상 예약 데이터(bookings)는 누구나 읽을 수 있게 설정되어 있으므로,<br>
       진짜 보안이 필요하면 이 URL 자체를 외부에 공유하지 않는 방식으로 관리해주세요.<br>
-      "상태"가 <b>대기중(만료가능)</b>으로 표시된 건 15분 홀드 시간이 지났지만 데이터가 아직 DB에 남아있는 예약이에요 — 슬롯 자체는 이미 재오픈된 상태입니다.
+      "상태"가 <b>대기중(만료가능)</b>으로 표시된 건 15분 홀드 시간이 지났지만 데이터가 아직 DB에 남아있는 예약이에요 — 슬롯 자체는 이미 재오픈된 상태입니다.<br>
+      <b>결제확인 체크박스</b>는 실제 Firebase 데이터의 status 값을 confirmed로 바꿔서, 해당 시간대가 영구적으로 잠기도록(이중예약 방지) 만들어요. 체크 즉시 예약 위젯에도 반영돼요.
     </footer>
   </main>
 </div>
@@ -188,8 +198,49 @@
 const DB_URL = "https://allcube-booking-default-rtdb.firebaseio.com";
 const ADMIN_PASSWORD = "allcube2026"; // 필요시 이 값만 바꿔서 비밀번호 변경 가능
 
+// 결제확인 체크박스를 실제로 Firebase에 반영하기 위한 Worker 설정
+// 아래 두 값은 Cloudflare Worker 배포 후 실제 값으로 바꿔주세요.
+const CONFIRM_WORKER_URL = "https://allcube-confirm-booking.chobuhong.workers.dev";
+const ADMIN_SECRET = "djaak0525##";
+
 let allCourses = {};
 let allBookingsFlat = []; // {courseId, date, time, id, name, phone, email, status, bookedAt}
+
+function bookingKeyOf(b) {
+  return `${b.courseId}__${b.date}__${b.time}__${b.id}`;
+}
+
+async function togglePaid(bookingKey, checkbox) {
+  const [courseId, date, time, id] = bookingKey.split('__');
+  const wantConfirmed = checkbox.checked;
+
+  checkbox.disabled = true;
+  try {
+    const res = await fetch(CONFIRM_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': ADMIN_SECRET
+      },
+      body: JSON.stringify({ courseId, date, time, bookingId: id, confirmed: wantConfirmed })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    // 로컬 데이터도 즉시 반영해서 화면을 다시 그림
+    const booking = allBookingsFlat.find(b => bookingKeyOf(b) === bookingKey);
+    if (booking) booking.status = wantConfirmed ? 'confirmed' : 'pending';
+    render();
+  } catch (err) {
+    alert('결제확인 반영에 실패했어요: ' + err.message + '\n(Worker 설정이 아직 안 되어 있다면, 코드 상단의 CONFIRM_WORKER_URL/ADMIN_SECRET을 먼저 채워주세요)');
+    checkbox.checked = !wantConfirmed; // 실패 시 체크 상태 되돌림
+  } finally {
+    checkbox.disabled = false;
+  }
+}
 
 function tryUnlock() {
   const input = document.getElementById('pwInput').value;
@@ -211,6 +262,7 @@ async function init() {
   document.getElementById('fromDate').addEventListener('change', render);
   document.getElementById('toDate').addEventListener('change', render);
   document.getElementById('searchInput').addEventListener('input', render);
+  document.getElementById('paidFilter').addEventListener('change', render);
 }
 
 async function loadData() {
@@ -302,6 +354,7 @@ function render() {
   const fromDate = document.getElementById('fromDate').value;
   const toDate = document.getElementById('toDate').value;
   const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const paidFilter = document.getElementById('paidFilter').value;
 
   let filtered = allBookingsFlat.filter(b => {
     if (courseFilter && courseFilter !== '__all__' && b.courseId !== courseFilter) return false;
@@ -311,6 +364,9 @@ function render() {
       const hay = `${b.name} ${b.phone} ${b.email}`.toLowerCase();
       if (!hay.includes(search)) return false;
     }
+    const isPaid = b.status === 'confirmed';
+    if (paidFilter === 'paid' && !isPaid) return false;
+    if (paidFilter === 'unpaid' && isPaid) return false;
     return true;
   });
 
@@ -327,35 +383,42 @@ function renderStats(list) {
   const total = list.length;
   const todayCount = list.filter(b => b.date === today).length;
   const weekCount = list.filter(b => b.date >= today && b.date <= weekAhead).length;
-  const activePending = list.filter(b => b.status === 'pending' && !isExpiredPending(b)).length;
+  const paidCount = list.filter(b => b.status === 'confirmed').length;
+  const unpaidCount = total - paidCount;
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card"><div class="num">${total}</div><div class="label">조회된 전체 예약</div></div>
     <div class="stat-card"><div class="num">${todayCount}</div><div class="label">오늘 예약</div></div>
     <div class="stat-card"><div class="num">${weekCount}</div><div class="label">향후 7일 예약</div></div>
-    <div class="stat-card"><div class="num">${activePending}</div><div class="label">홀드 진행중(결제 대기)</div></div>
+    <div class="stat-card"><div class="num" style="color:#157A3A;">${paidCount}</div><div class="label">결제 확인됨</div></div>
+    <div class="stat-card"><div class="num" style="color:#A66A00;">${unpaidCount}</div><div class="label">결제 미확인</div></div>
   `;
 }
 
 function renderTable(list) {
   const tbody = document.getElementById('tableBody');
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
     return;
   }
 
   tbody.innerHTML = list.map(b => {
     let statusHtml;
-    if (b.status === 'pending' && isExpiredPending(b)) {
+    if (b.status === 'confirmed') {
+      statusHtml = '<span class="status-pill status-confirmed">결제확정</span>';
+    } else if (b.status === 'pending' && isExpiredPending(b)) {
       statusHtml = '<span class="status-pill status-expired">대기중(만료가능)</span>';
     } else if (b.status === 'pending') {
       statusHtml = '<span class="status-pill status-pending">홀드중</span>';
     } else {
-      statusHtml = `<span class="status-pill status-confirmed">${b.status}</span>`;
+      statusHtml = `<span class="status-pill status-expired">알수없음(${b.status || '없음'})</span>`;
     }
     const bookedAtDisplay = b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '-';
+    const key = bookingKeyOf(b);
+    const isPaid = b.status === 'confirmed';
     return `
-      <tr>
+      <tr style="${isPaid ? 'background:#F3FBF5;' : ''}">
+        <td><input type="checkbox" ${isPaid ? 'checked' : ''} onchange="togglePaid('${key}', this)" style="width:18px; height:18px; cursor:pointer;" /></td>
         <td>${b.date}</td>
         <td>${b.time}</td>
         <td>${b.name}</td>
@@ -373,6 +436,7 @@ function downloadCSV() {
   const fromDate = document.getElementById('fromDate').value;
   const toDate = document.getElementById('toDate').value;
   const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const paidFilter = document.getElementById('paidFilter').value;
 
   let filtered = allBookingsFlat.filter(b => {
     if (courseFilter && courseFilter !== '__all__' && b.courseId !== courseFilter) return false;
@@ -382,14 +446,18 @@ function downloadCSV() {
       const hay = `${b.name} ${b.phone} ${b.email}`.toLowerCase();
       if (!hay.includes(search)) return false;
     }
+    const isPaid = b.status === 'confirmed';
+    if (paidFilter === 'paid' && !isPaid) return false;
+    if (paidFilter === 'unpaid' && isPaid) return false;
     return true;
   });
   filtered.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
-  const header = ['날짜','시간','이름','연락처','이메일','상태','예약접수시각','강의ID'];
+  const header = ['결제확인','날짜','시간','이름','연락처','이메일','상태','예약접수시각','강의ID'];
   const rows = filtered.map(b => [
+    b.status === 'confirmed' ? 'O' : '',
     b.date, b.time, b.name, b.phone, b.email,
-    (b.status === 'pending' && isExpiredPending(b)) ? '대기중(만료가능)' : b.status,
+    b.status === 'confirmed' ? '결제확정' : ((b.status === 'pending' && isExpiredPending(b)) ? '대기중(만료가능)' : (b.status || '알수없음')),
     b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '',
     b.courseId
   ]);
