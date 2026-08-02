@@ -216,12 +216,21 @@ async function init() {
 async function loadData() {
   document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="loading">불러오는 중...</td></tr>';
   try {
-    const [coursesRes, bookingsRes] = await Promise.all([
-      fetch(`${DB_URL}/courses.json`),
-      fetch(`${DB_URL}/bookings.json`)
-    ]);
+    // Firebase 규칙상 /bookings 최상위는 읽기 권한이 없고, /bookings/{courseId} 단위부터 읽기 가능함.
+    // 그래서 먼저 courses 목록을 가져온 뒤, 강의별로 따로 bookings를 요청함.
+    const coursesRes = await fetch(`${DB_URL}/courses.json`);
     allCourses = await coursesRes.json() || {};
-    const bookingsRaw = await bookingsRes.json() || {};
+
+    let courseIds = Object.keys(allCourses);
+    if (courseIds.length === 0) courseIds = ['oneday']; // 안전장치: courses가 비어있어도 기본 강의는 시도
+
+    const bookingsByCoursePromises = courseIds.map(courseId =>
+      fetch(`${DB_URL}/bookings/${courseId}.json`)
+        .then(res => res.json())
+        .then(data => ({ courseId, data }))
+        .catch(() => ({ courseId, data: null }))
+    );
+    const bookingsByCourse = await Promise.all(bookingsByCoursePromises);
 
     allBookingsFlat = [];
 
@@ -254,8 +263,8 @@ async function loadData() {
       }
     }
 
-    for (const courseId in bookingsRaw) {
-      walk(bookingsRaw[courseId], [], courseId);
+    for (const { courseId, data } of bookingsByCourse) {
+      if (data) walk(data, [], courseId);
     }
 
     populateCourseSelect();
