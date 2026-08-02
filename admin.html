@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLAY ALLCUBE 예약 관리자</title>
+<style>
+  :root {
+    --navy: #0B1834;
+    --blue: #2F6BFF;
+    --yellow: #FFC844;
+    --gray-bg: #F4F6FA;
+    --gray-border: #E1E5EC;
+    --text-dim: #6B7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: var(--gray-bg);
+    color: var(--navy);
+  }
+
+  /* 잠금 화면 */
+  #lockScreen {
+    position: fixed; inset: 0; background: var(--navy);
+    display: flex; align-items: center; justify-content: center; z-index: 999;
+  }
+  #lockBox {
+    background: white; padding: 36px 32px; border-radius: 16px;
+    width: 100%; max-width: 340px; text-align: center;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  }
+  #lockBox h2 { margin: 0 0 6px; font-size: 20px; }
+  #lockBox p { margin: 0 0 20px; color: var(--text-dim); font-size: 13px; }
+  #lockBox input {
+    width: 100%; padding: 12px 14px; border-radius: 10px;
+    border: 1.5px solid var(--gray-border); font-size: 15px; margin-bottom: 12px;
+  }
+  #lockBox button {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
+    background: var(--blue); color: white; font-size: 15px; font-weight: 700;
+    cursor: pointer;
+  }
+  #lockError { color: #D01C28; font-size: 13px; margin-top: 8px; min-height: 18px; }
+
+  /* 본문 */
+  #app { display: none; }
+  header {
+    background: var(--navy); color: white; padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  header .badge {
+    background: var(--yellow); color: var(--navy); font-weight: 700;
+    font-size: 12px; padding: 4px 10px; border-radius: 999px;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: white; border-radius: 14px; padding: 16px 18px;
+    border: 1px solid var(--gray-border);
+  }
+  .stat-card .num { font-size: 26px; font-weight: 800; color: var(--blue); }
+  .stat-card .label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+  .controls {
+    background: white; border-radius: 14px; padding: 16px;
+    border: 1px solid var(--gray-border); margin-bottom: 16px;
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  }
+  .controls input, .controls select {
+    padding: 9px 12px; border-radius: 8px; border: 1.5px solid var(--gray-border);
+    font-size: 14px; min-width: 0;
+  }
+  .controls label { font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+  .field { display: flex; flex-direction: column; }
+  .controls button {
+    padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 700;
+  }
+  #refreshBtn { background: var(--blue); color: white; }
+  #csvBtn { background: var(--yellow); color: var(--navy); }
+  #searchInput { flex: 1; min-width: 160px; }
+
+  .table-wrap {
+    background: white; border-radius: 14px; border: 1px solid var(--gray-border);
+    overflow: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--gray-border); white-space: nowrap; }
+  th { background: #FAFBFD; font-size: 12px; color: var(--text-dim); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #F8FAFF; }
+
+  .status-pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  }
+  .status-pending { background: #FFF3D6; color: #A66A00; }
+  .status-expired { background: #F1F1F1; color: #888; }
+  .status-confirmed { background: #DFF3E4; color: #157A3A; }
+
+  .empty { padding: 40px; text-align: center; color: var(--text-dim); font-size: 14px; }
+  .loading { padding: 40px; text-align: center; color: var(--text-dim); font-size: 14px; }
+
+  footer.note {
+    margin-top: 16px; font-size: 12px; color: var(--text-dim); line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div id="lockBox">
+    <h2>🔒 관리자 접속</h2>
+    <p>PLAY ALLCUBE 예약 조회 페이지</p>
+    <input type="password" id="pwInput" placeholder="비밀번호 입력" />
+    <button onclick="tryUnlock()">입장하기</button>
+    <div id="lockError"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>📅 PLAY ALLCUBE 예약 관리자</h1>
+    <span class="badge">Firebase 연동</span>
+  </header>
+
+  <main>
+    <div class="stats" id="statsRow"></div>
+
+    <div class="controls">
+      <div class="field">
+        <label>강의</label>
+        <select id="courseSelect"></select>
+      </div>
+      <div class="field">
+        <label>시작일</label>
+        <input type="date" id="fromDate" />
+      </div>
+      <div class="field">
+        <label>종료일</label>
+        <input type="date" id="toDate" />
+      </div>
+      <div class="field" style="flex:1; min-width:180px;">
+        <label>이름 / 연락처 검색</label>
+        <input type="text" id="searchInput" placeholder="예: 홍길동 또는 010" />
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="refreshBtn" onclick="loadData()">새로고침</button>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="csvBtn" onclick="downloadCSV()">CSV 다운로드</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>날짜</th>
+            <th>시간</th>
+            <th>이름</th>
+            <th>연락처</th>
+            <th>이메일</th>
+            <th>상태</th>
+            <th>예약접수 시각</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="7" class="loading">불러오는 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="note">
+      ⚠️ 이 페이지는 간단한 화면 잠금만 적용되어 있어요. Firebase 보안 규칙상 예약 데이터(bookings)는 누구나 읽을 수 있게 설정되어 있으므로,<br>
+      진짜 보안이 필요하면 이 URL 자체를 외부에 공유하지 않는 방식으로 관리해주세요.<br>
+      "상태"가 <b>대기중(만료가능)</b>으로 표시된 건 15분 홀드 시간이 지났지만 데이터가 아직 DB에 남아있는 예약이에요 — 슬롯 자체는 이미 재오픈된 상태입니다.
+    </footer>
+  </main>
+</div>
+
+<script>
+const DB_URL = "https://allcube-booking-default-rtdb.firebaseio.com";
+const ADMIN_PASSWORD = "allcube2026"; // 필요시 이 값만 바꿔서 비밀번호 변경 가능
+
+let allCourses = {};
+let allBookingsFlat = []; // {courseId, date, time, id, name, phone, email, status, bookedAt}
+
+function tryUnlock() {
+  const input = document.getElementById('pwInput').value;
+  if (input === ADMIN_PASSWORD) {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    init();
+  } else {
+    document.getElementById('lockError').textContent = '비밀번호가 올바르지 않습니다.';
+  }
+}
+document.getElementById('pwInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryUnlock();
+});
+
+async function init() {
+  await loadData();
+  document.getElementById('courseSelect').addEventListener('change', render);
+  document.getElementById('fromDate').addEventListener('change', render);
+  document.getElementById('toDate').addEventListener('change', render);
+  document.getElementById('searchInput').addEventListener('input', render);
+}
+
+async function loadData() {
+  document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="loading">불러오는 중...</td></tr>';
+  try {
+    const [coursesRes, bookingsRes] = await Promise.all([
+      fetch(`${DB_URL}/courses.json`),
+      fetch(`${DB_URL}/bookings.json`)
+    ]);
+    allCourses = await coursesRes.json() || {};
+    const bookingsRaw = await bookingsRes.json() || {};
+
+    allBookingsFlat = [];
+    for (const courseId in bookingsRaw) {
+      const dates = bookingsRaw[courseId];
+      for (const date in dates) {
+        const times = dates[date];
+        for (const time in times) {
+          const entries = times[time];
+          for (const id in entries) {
+            const e = entries[id];
+            allBookingsFlat.push({
+              courseId, date, time, id,
+              name: e.name || '-',
+              phone: e.phone || '-',
+              email: e.email || '',
+              status: e.status || 'pending',
+              bookedAt: e.bookedAt || ''
+            });
+          }
+        }
+      }
+    }
+
+    populateCourseSelect();
+    render();
+  } catch (err) {
+    document.getElementById('tableBody').innerHTML =
+      `<tr><td colspan="7" class="empty">데이터를 불러오지 못했어요. (${err.message})</td></tr>`;
+  }
+}
+
+function populateCourseSelect() {
+  const sel = document.getElementById('courseSelect');
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="__all__">전체 강의</option>';
+  const courseIds = new Set([...Object.keys(allCourses), ...allBookingsFlat.map(b => b.courseId)]);
+  courseIds.forEach(cid => {
+    const opt = document.createElement('option');
+    opt.value = cid;
+    opt.textContent = allCourses[cid]?.name ? `${allCourses[cid].name} (${cid})` : cid;
+    sel.appendChild(opt);
+  });
+  if ([...sel.options].some(o => o.value === prevValue)) sel.value = prevValue;
+}
+
+function isExpiredPending(booking) {
+  if (booking.status !== 'pending') return false;
+  const holdMinutes = allCourses[booking.courseId]?.holdMinutes || 15;
+  const bookedTime = new Date(booking.bookedAt).getTime();
+  if (isNaN(bookedTime)) return false;
+  return (Date.now() - bookedTime) > holdMinutes * 60 * 1000;
+}
+
+function render() {
+  const courseFilter = document.getElementById('courseSelect').value;
+  const fromDate = document.getElementById('fromDate').value;
+  const toDate = document.getElementById('toDate').value;
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let filtered = allBookingsFlat.filter(b => {
+    if (courseFilter && courseFilter !== '__all__' && b.courseId !== courseFilter) return false;
+    if (fromDate && b.date < fromDate) return false;
+    if (toDate && b.date > toDate) return false;
+    if (search) {
+      const hay = `${b.name} ${b.phone} ${b.email}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+  renderStats(filtered);
+  renderTable(filtered);
+}
+
+function renderStats(list) {
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+  const total = list.length;
+  const todayCount = list.filter(b => b.date === today).length;
+  const weekCount = list.filter(b => b.date >= today && b.date <= weekAhead).length;
+  const activePending = list.filter(b => b.status === 'pending' && !isExpiredPending(b)).length;
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="num">${total}</div><div class="label">조회된 전체 예약</div></div>
+    <div class="stat-card"><div class="num">${todayCount}</div><div class="label">오늘 예약</div></div>
+    <div class="stat-card"><div class="num">${weekCount}</div><div class="label">향후 7일 예약</div></div>
+    <div class="stat-card"><div class="num">${activePending}</div><div class="label">홀드 진행중(결제 대기)</div></div>
+  `;
+}
+
+function renderTable(list) {
+  const tbody = document.getElementById('tableBody');
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(b => {
+    let statusHtml;
+    if (b.status === 'pending' && isExpiredPending(b)) {
+      statusHtml = '<span class="status-pill status-expired">대기중(만료가능)</span>';
+    } else if (b.status === 'pending') {
+      statusHtml = '<span class="status-pill status-pending">홀드중</span>';
+    } else {
+      statusHtml = `<span class="status-pill status-confirmed">${b.status}</span>`;
+    }
+    const bookedAtDisplay = b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '-';
+    return `
+      <tr>
+        <td>${b.date}</td>
+        <td>${b.time}</td>
+        <td>${b.name}</td>
+        <td>${b.phone}</td>
+        <td>${b.email || '-'}</td>
+        <td>${statusHtml}</td>
+        <td>${bookedAtDisplay}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function downloadCSV() {
+  const courseFilter = document.getElementById('courseSelect').value;
+  const fromDate = document.getElementById('fromDate').value;
+  const toDate = document.getElementById('toDate').value;
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let filtered = allBookingsFlat.filter(b => {
+    if (courseFilter && courseFilter !== '__all__' && b.courseId !== courseFilter) return false;
+    if (fromDate && b.date < fromDate) return false;
+    if (toDate && b.date > toDate) return false;
+    if (search) {
+      const hay = `${b.name} ${b.phone} ${b.email}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+  filtered.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+  const header = ['날짜','시간','이름','연락처','이메일','상태','예약접수시각','강의ID'];
+  const rows = filtered.map(b => [
+    b.date, b.time, b.name, b.phone, b.email,
+    (b.status === 'pending' && isExpiredPending(b)) ? '대기중(만료가능)' : b.status,
+    b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '',
+    b.courseId
+  ]);
+
+  const csvContent = [header, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `allcube_예약목록_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
