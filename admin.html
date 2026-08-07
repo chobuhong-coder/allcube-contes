@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -134,8 +135,8 @@
         <input type="date" id="toDate" />
       </div>
       <div class="field" style="flex:1; min-width:180px;">
-        <label>이름 / 연락처 검색</label>
-        <input type="text" id="searchInput" placeholder="예: 홍길동 또는 010" />
+        <label>이름 / 연락처 / 메모 검색</label>
+        <input type="text" id="searchInput" placeholder="예: 홍길동, 010, 보호자명 등" />
       </div>
       <div class="field">
         <label>&nbsp;</label>
@@ -165,12 +166,13 @@
             <th>이름</th>
             <th>연락처</th>
             <th>이메일</th>
+            <th>메모</th>
             <th>상태</th>
             <th>예약접수 시각</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="8" class="loading">불러오는 중...</td></tr>
+          <tr><td colspan="9" class="loading">불러오는 중...</td></tr>
         </tbody>
       </table>
     </div>
@@ -181,7 +183,8 @@
       "상태"가 <b>대기중(만료가능)</b>으로 표시된 건 15분 홀드 시간이 지났지만 데이터가 아직 DB에 남아있는 예약이에요 — 슬롯 자체는 이미 재오픈된 상태입니다.<br>
       <b>결제확인 체크박스</b>는 실제 Firebase 데이터의 status 값을 confirmed로 바꿔서, 해당 시간대가 영구적으로 잠기도록(이중예약 방지) 만들어요. 체크 즉시 예약 위젯에도 반영돼요.<br>
       <b style="color:#D01C28;">⚠️중복</b> 표시는 같은 연락처로 미결제 예약이 여러 건 있다는 뜻이에요. 이땐 아임웹 주문 생성 시각과, 이 표의 "예약접수 시각" 중 <b>가장 가까운 시각의 건</b>이 실제 결제된 예약일 확률이 높아요 (고객은 보통 예약 직후 바로 결제 페이지로 넘어가기 때문).<br>
-      <b>"날짜/반"</b> 열은 원데이클래스처럼 날짜기반 강의는 실제 날짜(YYYY-MM-DD)가, 정규반처럼 요일반 기반(rolling capacity) 강의는 "월요일반" 같은 반 이름이 표시돼요. 반 기반 강의는 특정 날짜가 아니라 그 반 자체에 정원이 걸려있어서 날짜 개념이 없어요.
+      <b>"날짜/반"</b> 열은 원데이클래스처럼 날짜기반 강의는 실제 날짜(YYYY-MM-DD)가, 정규반처럼 요일반 기반(rolling capacity) 강의는 "월요일반" 같은 반 이름이 표시돼요. 반 기반 강의는 특정 날짜가 아니라 그 반 자체에 정원이 걸려있어서 날짜 개념이 없어요.<br>
+      <b>"메모"</b> 열은 예약자가 예약 시 남긴 선택 입력(예: 결제자와 예약자가 다른 경우 보호자/학생 이름)이에요. 김하준-김동주 케이스처럼 예약자와 결제자 이름이 다를 때 대조하는 용도로 쓰세요.
     </footer>
   </main>
 </div>
@@ -254,7 +257,7 @@ init();
 
 
 async function loadData() {
-  document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="loading">불러오는 중...</td></tr>';
+  document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" class="loading">불러오는 중...</td></tr>';
   try {
     // Firebase 규칙상 /bookings 최상위는 읽기 권한이 없고, /bookings/{courseId} 단위부터 읽기 가능함.
     // 그래서 먼저 courses 목록을 가져온 뒤, 강의별로 따로 bookings를 요청함.
@@ -291,6 +294,7 @@ async function loadData() {
           name: node.name || '-',
           phone: node.phone || '-',
           email: node.email || '',
+          memo: node.memo || '',
           status: node.status || 'pending',
           bookedAt: node.bookedAt || ''
         });
@@ -311,7 +315,7 @@ async function loadData() {
     render();
   } catch (err) {
     document.getElementById('tableBody').innerHTML =
-      `<tr><td colspan="7" class="empty">데이터를 불러오지 못했어요. (${err.message})</td></tr>`;
+      `<tr><td colspan="9" class="empty">데이터를 불러오지 못했어요. (${err.message})</td></tr>`;
   }
 }
 
@@ -349,7 +353,7 @@ function render() {
     if (fromDate && b.date < fromDate) return false;
     if (toDate && b.date > toDate) return false;
     if (search) {
-      const hay = `${b.name} ${b.phone} ${b.email}`.toLowerCase();
+      const hay = `${b.name} ${b.phone} ${b.email} ${b.memo}`.toLowerCase();
       if (!hay.includes(search)) return false;
     }
     const isPaid = b.status === 'confirmed';
@@ -386,7 +390,7 @@ function renderStats(list) {
 function renderTable(list) {
   const tbody = document.getElementById('tableBody');
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
     return;
   }
 
@@ -425,6 +429,7 @@ function renderTable(list) {
         <td>${b.name}</td>
         <td>${b.phone}${dupWarning}</td>
         <td>${b.email || '-'}</td>
+        <td>${b.memo || '-'}</td>
         <td>${statusHtml}</td>
         <td>${bookedAtDisplay}</td>
       </tr>
@@ -444,7 +449,7 @@ function downloadCSV() {
     if (fromDate && b.date < fromDate) return false;
     if (toDate && b.date > toDate) return false;
     if (search) {
-      const hay = `${b.name} ${b.phone} ${b.email}`.toLowerCase();
+      const hay = `${b.name} ${b.phone} ${b.email} ${b.memo}`.toLowerCase();
       if (!hay.includes(search)) return false;
     }
     const isPaid = b.status === 'confirmed';
@@ -454,10 +459,10 @@ function downloadCSV() {
   });
   filtered.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
-  const header = ['결제확인','날짜/반','시간','이름','연락처','이메일','상태','예약접수시각','강의ID'];
+  const header = ['결제확인','날짜/반','시간','이름','연락처','이메일','메모','상태','예약접수시각','강의ID'];
   const rows = filtered.map(b => [
     b.status === 'confirmed' ? 'O' : '',
-    displayDateOf(b), b.time, b.name, b.phone, b.email,
+    displayDateOf(b), b.time, b.name, b.phone, b.email, b.memo,
     b.status === 'confirmed' ? '결제확정' : ((b.status === 'pending' && isExpiredPending(b)) ? '대기중(만료가능)' : (b.status || '알수없음')),
     b.bookedAt ? new Date(b.bookedAt).toLocaleString('ko-KR') : '',
     b.courseId
