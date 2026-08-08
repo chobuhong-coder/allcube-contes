@@ -155,6 +155,13 @@
           <option value="paid">결제 확인됨만</option>
         </select>
       </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <label style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:13px; color:#4a5670; white-space:nowrap; padding:8px 0;">
+          <input type="checkbox" id="hidePastToggle" checked style="width:16px; height:16px; cursor:pointer;" />
+          지난 예약 숨기기
+        </label>
+      </div>
     </div>
 
     <div class="table-wrap">
@@ -171,10 +178,11 @@
             <th>메모</th>
             <th>상태</th>
             <th>예약접수 시각</th>
+            <th>관리</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="10" class="loading">불러오는 중...</td></tr>
+          <tr><td colspan="11" class="loading">불러오는 중...</td></tr>
         </tbody>
       </table>
     </div>
@@ -198,6 +206,8 @@ const DB_URL = "https://allcube-booking-default-rtdb.firebaseio.com";
 // 아래 두 값은 Cloudflare Worker 배포 후 실제 값으로 바꿔주세요.
 const CONFIRM_WORKER_URL = "https://allcube-confirm-booking.chobuhong.workers.dev";
 const ADMIN_SECRET = "djaak0525##";
+// 예약 완전 삭제용 Worker (신규 배포 필요, 아래 가이드 참고). 배포 전까지는 삭제 버튼이 동작하지 않아요.
+const DELETE_WORKER_URL = "https://allcube-delete-booking.chobuhong.workers.dev";
 
 let allCourses = {};
 let allBookingsFlat = []; // {courseId, date, time, id, name, phone, email, status, bookedAt}
@@ -247,6 +257,39 @@ async function togglePaid(bookingKey, checkbox) {
   }
 }
 
+async function deleteBooking(bookingKey, btn) {
+  const [courseId, date, time, id] = bookingKey.split('__');
+  const booking = allBookingsFlat.find(b => bookingKeyOf(b) === bookingKey);
+  const label = booking ? `${booking.name} · ${date} ${time}` : `${date} ${time}`;
+
+  if (!confirm(`정말 삭제할까요?\n${label}\n\n이 작업은 되돌릴 수 없어요.`)) return;
+
+  btn.disabled = true;
+  btn.textContent = '삭제 중...';
+  try {
+    const res = await fetch(DELETE_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': ADMIN_SECRET
+      },
+      body: JSON.stringify({ courseId, date, time, bookingId: id })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err.error || `HTTP ${res.status}`) + (err.detail ? ` / ${err.detail}` : ''));
+    }
+
+    allBookingsFlat = allBookingsFlat.filter(b => bookingKeyOf(b) !== bookingKey);
+    render();
+  } catch (err) {
+    alert('삭제에 실패했어요: ' + err.message + '\n(DELETE_WORKER_URL이 아직 배포/설정되지 않았다면 코드 상단 값을 먼저 채워주세요)');
+    btn.disabled = false;
+    btn.textContent = '삭제';
+  }
+}
+
 async function init() {
   await loadData();
   document.getElementById('courseSelect').addEventListener('change', render);
@@ -254,6 +297,7 @@ async function init() {
   document.getElementById('toDate').addEventListener('change', render);
   document.getElementById('searchInput').addEventListener('input', render);
   document.getElementById('paidFilter').addEventListener('change', render);
+  document.getElementById('hidePastToggle').addEventListener('change', render);
 }
 init();
 
@@ -349,6 +393,8 @@ function render() {
   const toDate = document.getElementById('toDate').value;
   const search = document.getElementById('searchInput').value.trim().toLowerCase();
   const paidFilter = document.getElementById('paidFilter').value;
+  const hidePast = document.getElementById('hidePastToggle').checked;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   let filtered = allBookingsFlat.filter(b => {
     if (courseFilter && courseFilter !== '__all__' && b.courseId !== courseFilter) return false;
@@ -361,6 +407,12 @@ function render() {
     const isPaid = b.status === 'confirmed';
     if (paidFilter === 'paid' && !isPaid) return false;
     if (paidFilter === 'unpaid' && isPaid) return false;
+    if (hidePast) {
+      // 반(요일) 기반 강의는 date 자리에 classKey("mon" 등)가 들어있어 "완료"라는 개념이 없음 -> 항상 표시
+      const course = allCourses[b.courseId];
+      const isRecurring = course && course.mode === 'recurring';
+      if (!isRecurring && b.date < todayStr) return false;
+    }
     return true;
   });
 
@@ -392,7 +444,7 @@ function renderStats(list) {
 function renderTable(list) {
   const tbody = document.getElementById('tableBody');
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="empty">조건에 맞는 예약이 없어요.</td></tr>';
     return;
   }
 
@@ -436,6 +488,7 @@ function renderTable(list) {
         <td>${b.memo || '-'}</td>
         <td>${statusHtml}</td>
         <td>${bookedAtDisplay}</td>
+        <td><button onclick="deleteBooking('${key}', this)" style="background:#FDEBEC; color:#D01C28; border:1px solid #F5C2C7; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer;">삭제</button></td>
       </tr>
     `;
   }).join('');
